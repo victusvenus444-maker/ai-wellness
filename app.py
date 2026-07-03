@@ -59,7 +59,7 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 # ---------- RevenueCat ----------
-REVENUECAT_WEBHOOK_SECRET = os.getenv('REVENUECAT_WEBHOOK_SECRET')  # optional
+REVENUECAT_WEBHOOK_SECRET = os.getenv('REVENUECAT_WEBHOOK_SECRET')
 
 # ---------- Models ----------
 class User(UserMixin, db.Model):
@@ -68,7 +68,7 @@ class User(UserMixin, db.Model):
     password_hash = db.Column(db.String(128), nullable=False)
     plan = db.Column(db.String(20), default='free')  # free, elite, pro
     revenuecat_user_id = db.Column(db.String(100), nullable=True)
-    subscription_product_id = db.Column(db.String(100), nullable=True)  # store the product ID
+    subscription_product_id = db.Column(db.String(100), nullable=True)
     referral_code = db.Column(db.String(20), unique=True, nullable=False)
     bonus_messages = db.Column(db.Integer, default=0)
     referred_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
@@ -617,15 +617,30 @@ def mark_proactive_read(msg_id):
     db.session.commit()
     return jsonify({'success': True})
 
-# ---------- RevenueCat Webhook (Updated for yearly support) ----------
+# ---------- RevenueCat Webhook (with signature verification) ----------
 @app.route('/webhook/revenuecat', methods=['POST'])
 def revenuecat_webhook():
-    # For production, verify signature using REVENUECAT_WEBHOOK_SECRET
+    # Verify signature
+    signature = request.headers.get('X-Signature')
+    if not signature or not REVENUECAT_WEBHOOK_SECRET:
+        app.logger.warning("Missing signature or webhook secret")
+        return 'Missing signature', 400
+
+    payload = request.data
+    expected = hmac.new(
+        REVENUECAT_WEBHOOK_SECRET.encode(),
+        payload,
+        hashlib.sha256
+    ).hexdigest()
+
+    if not hmac.compare_digest(signature, expected):
+        app.logger.warning("Invalid webhook signature")
+        return 'Invalid signature', 401
+
     data = request.json
     event = data.get('event')
 
     if event in ('INITIAL_PURCHASE', 'RENEWAL', 'NON_RENEWING_PURCHASE'):
-        # Extract app_user_id (our user ID)
         app_user_id = data.get('app_user_id')
         if not app_user_id:
             return jsonify({'error': 'Missing app_user_id'}), 400
@@ -639,24 +654,15 @@ def revenuecat_webhook():
         if not user:
             return jsonify({'error': 'User not found'}), 404
 
-        # Get product identifier from the event
-        # The event structure may vary; we'll look for product_id in the purchase details
+        # Extract product_id
         product_id = None
-        # For INITIAL_PURCHASE, the product identifier is in the 'product' field.
-        # For RENEWAL, it might be in 'product' as well.
-        # We'll try to extract it from the first purchase in the 'purchases' list if available.
         if 'purchases' in data and data['purchases']:
             first_purchase = data['purchases'][0]
             product_id = first_purchase.get('product_id')
         elif 'product' in data:
             product_id = data.get('product')
 
-        if not product_id:
-            app.logger.warning("Product ID not found in webhook payload")
-            # Fallback: assume pro
-            user.plan = 'pro'
-        else:
-            # Map product ID to plan
+        if product_id:
             if product_id.startswith('aura_elite'):
                 user.plan = 'elite'
             elif product_id.startswith('aura_pro'):
@@ -664,19 +670,25 @@ def revenuecat_webhook():
             else:
                 # Unknown product, default to pro
                 user.plan = 'pro'
-            # Store the product ID for reference
             user.subscription_product_id = product_id
+        else:
+            # Fallback: assume pro if entitlement is active
+            entitlement = data.get('entitlements', {}).get('pro', {})
+            if entitlement.get('is_active'):
+                user.plan = 'pro'
+            else:
+                # If no entitlement, keep current plan? But we should be safe.
+                pass
 
-        # Reset monthly usage on new purchase
         user.monthly_messages_used = 0
         user.month_start = date.today()
         db.session.commit()
-        app.logger.info(f"User {user.id} plan updated to {user.plan} via webhook (product: {product_id})")
+        app.logger.info(f"Webhook: user {user.id} plan updated to {user.plan} (product: {product_id})")
         return jsonify({'status': 'ok'}), 200
 
     return jsonify({'status': 'ignored'}), 200
 
-# ---------- Web Views (for web version, not needed for mobile) ----------
+# ---------- Web Views (for web version) ----------
 @app.route('/')
 def index():
     return render_template('index.html')
