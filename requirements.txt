@@ -4,8 +4,10 @@ flask-bcrypt
 flask-login
 flask-cors
 flask-limiter
+flask-jwt-extended
 openai
-requests
 python-dotenv
-psycopg2-binary
+requests
+apscheduler
+pytz
 gunicorn
