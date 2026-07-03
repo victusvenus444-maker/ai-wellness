@@ -1,0 +1,1761 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aura – Your AI Companion</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet" />
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f4f6fb;
+            color: #1a1a2e;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .global-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1300px;
+            margin: 0 auto 20px;
+            padding: 0 12px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .global-header .brand {
+            font-size: 28px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #4a6cf7, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .global-header .auth-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 14px;
+        }
+        .global-header .auth-area .email {
+            color: #5a5a7a;
+        }
+        .global-header .auth-area .pro-badge {
+            background: rgba(74,108,247,0.12);
+            color: #4a6cf7;
+            padding: 2px 14px;
+            border-radius: 40px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .global-header .auth-area button {
+            background: transparent;
+            border: 1px solid rgba(0,0,0,0.08);
+            color: #1a1a2e;
+            padding: 6px 18px;
+            border-radius: 40px;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 14px;
+        }
+        .global-header .auth-area button:hover {
+            background: rgba(0,0,0,0.04);
+        }
+        .global-header .auth-area .btn-primary {
+            background: linear-gradient(135deg, #4a6cf7, #a855f7);
+            border: none;
+            color: #fff;
+            font-weight: 600;
+        }
+        .global-header .auth-area .btn-primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(74,108,247,0.3);
+        }
+        .global-header .auth-area .logout-btn {
+            color: #b91c1c;
+            border-color: rgba(185,28,28,0.2);
+        }
+        .global-header .auth-area .logout-btn:hover {
+            background: rgba(185,28,28,0.04);
+        }
+        .global-header .auth-area .account-link {
+            color: #4a6cf7;
+            text-decoration: none;
+            font-size: 14px;
+            margin-left: 4px;
+        }
+        .global-header .auth-area .account-link:hover {
+            text-decoration: underline;
+        }
+
+        .messenger {
+            max-width: 1300px;
+            margin: 0 auto 40px;
+            background: #ffffff;
+            border-radius: 28px;
+            display: flex;
+            overflow: hidden;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+            border: 1px solid rgba(0,0,0,0.04);
+            height: 560px;
+        }
+        .sidebar {
+            width: 300px;
+            background: #fafbfc;
+            border-right: 1px solid rgba(0,0,0,0.04);
+            display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        .sidebar-header {
+            padding: 16px 18px 12px;
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .sidebar-header .new-btn {
+            background: rgba(0,0,0,0.04);
+            border: none;
+            color: #5a5a7a;
+            padding: 4px 14px;
+            border-radius: 40px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .sidebar-header .new-btn:hover:not(:disabled) {
+            background: rgba(0,0,0,0.08);
+            color: #1a1a2e;
+        }
+        .sidebar-header .new-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .sidebar-header .companion-count {
+            font-size: 12px;
+            color: #7a7a9a;
+        }
+        .sidebar-search {
+            padding: 10px 18px;
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+        }
+        .sidebar-search input {
+            width: 100%;
+            padding: 6px 14px;
+            background: rgba(0,0,0,0.02);
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 40px;
+            color: #1a1a2e;
+            outline: none;
+            font-size: 13px;
+        }
+        .sidebar-search input:focus {
+            border-color: #4a6cf7;
+        }
+        .companion-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 6px 0;
+        }
+        .companion-item {
+            display: flex;
+            align-items: center;
+            padding: 10px 18px;
+            cursor: pointer;
+            transition: 0.2s;
+            border-left: 3px solid transparent;
+            border-radius: 0 12px 12px 0;
+        }
+        .companion-item:hover {
+            background: rgba(74,108,247,0.04);
+        }
+        .companion-item.active {
+            background: rgba(74,108,247,0.06);
+            border-left-color: #4a6cf7;
+        }
+        .companion-item .avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            margin-right: 12px;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            color: #fff;
+            font-size: 14px;
+            background: #4a6cf7;
+            overflow: hidden;
+        }
+        .companion-item .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .companion-item .info {
+            flex: 1;
+            min-width: 0;
+        }
+        .companion-item .name {
+            font-weight: 500;
+            font-size: 15px;
+        }
+        .companion-item .preview {
+            font-size: 12px;
+            color: #7a7a9a;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .companion-item .delete-btn {
+            background: none;
+            border: none;
+            color: #aaa;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        .companion-item .delete-btn:hover {
+            color: #b91c1c;
+        }
+        .companion-item.mock {
+            opacity: 0.7;
+            cursor: default;
+        }
+        .companion-item.mock .delete-btn { display: none; }
+        .companion-item .mock-badge {
+            font-size: 10px;
+            background: rgba(0,0,0,0.04);
+            padding: 0 8px;
+            border-radius: 40px;
+            color: #7a7a9a;
+            margin-left: 6px;
+        }
+
+        .sidebar-referral {
+            padding: 12px 18px;
+            border-top: 1px solid rgba(0,0,0,0.04);
+            position: relative;
+        }
+        .sidebar-referral .ref-title {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .sidebar-referral .ref-title .info-icon {
+            cursor: help;
+            font-size: 14px;
+            color: #4a6cf7;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: rgba(74,108,247,0.08);
+        }
+        .sidebar-referral .ref-tooltip {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 10px);
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1a1a2e;
+            color: #fff;
+            padding: 12px 16px;
+            border-radius: 12px;
+            font-size: 13px;
+            line-height: 1.5;
+            max-width: 260px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+            z-index: 10;
+            text-align: left;
+        }
+        .sidebar-referral .ref-tooltip::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 8px solid transparent;
+            border-top-color: #1a1a2e;
+        }
+        .sidebar-referral .ref-tooltip.visible {
+            display: block;
+        }
+        .sidebar-referral .ref-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sidebar-referral .ref-code {
+            background: #f1f3f8;
+            padding: 2px 10px;
+            border-radius: 40px;
+            font-size: 13px;
+            flex: 1;
+            font-family: monospace;
+        }
+        .sidebar-referral .ref-btn {
+            padding: 2px 12px;
+            font-size: 12px;
+        }
+        .sidebar-referral .bonus-info {
+            font-size: 12px;
+            color: #7a7a9a;
+            margin-top: 4px;
+        }
+
+        .chat-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #ffffff;
+        }
+        .chat-header {
+            padding: 12px 20px;
+            border-bottom: 1px solid rgba(0,0,0,0.04);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: #fafbfc;
+        }
+        .chat-header .companion-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .chat-header .companion-info .avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #4a6cf7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #fff;
+            font-weight: 600;
+            font-size: 14px;
+            overflow: hidden;
+        }
+        .chat-header .companion-info .avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .chat-header .companion-info .name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .chat-header .companion-info .traits {
+            font-size: 12px;
+            color: #7a7a9a;
+            margin-left: 4px;
+        }
+        .chat-header .chat-actions {
+            display: flex;
+            gap: 8px;
+        }
+        .chat-header .chat-actions button {
+            background: transparent;
+            border: 1px solid rgba(0,0,0,0.06);
+            color: #5a5a7a;
+            padding: 4px 12px;
+            border-radius: 40px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .chat-header .chat-actions button:hover {
+            background: rgba(0,0,0,0.04);
+            color: #1a1a2e;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .message {
+            max-width: 75%;
+            padding: 8px 14px;
+            border-radius: 16px;
+            line-height: 1.5;
+            word-wrap: break-word;
+            font-size: 14px;
+            animation: fadeIn 0.2s ease;
+        }
+        .message.user {
+            align-self: flex-end;
+            background: #4a6cf7;
+            color: #fff;
+            border-bottom-right-radius: 4px;
+        }
+        .message.assistant {
+            align-self: flex-start;
+            background: #f1f3f8;
+            color: #1a1a2e;
+            border-bottom-left-radius: 4px;
+        }
+        .message .time {
+            font-size: 10px;
+            opacity: 0.6;
+            margin-top: 2px;
+            display: block;
+        }
+        .message.user .time { color: rgba(255,255,255,0.7); }
+        .message.assistant .time { color: #7a7a9a; }
+
+        .chat-input-area {
+            padding: 12px 20px;
+            border-top: 1px solid rgba(0,0,0,0.04);
+            display: flex;
+            gap: 10px;
+            background: #fafbfc;
+        }
+        .chat-input-area input {
+            flex: 1;
+            padding: 10px 16px;
+            background: #fff;
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 40px;
+            color: #1a1a2e;
+            outline: none;
+            font-size: 14px;
+        }
+        .chat-input-area input:focus {
+            border-color: #4a6cf7;
+        }
+        .chat-input-area input:disabled {
+            opacity: 0.6;
+        }
+        .chat-input-area button {
+            padding: 10px 24px;
+            background: linear-gradient(135deg, #4a6cf7, #a855f7);
+            border: none;
+            border-radius: 40px;
+            color: #fff;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .chat-input-area button:hover:not(:disabled) {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(74,108,247,0.3);
+        }
+        .chat-input-area button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .welcome-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #7a7a9a;
+            text-align: center;
+        }
+        .welcome-placeholder .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+        .welcome-placeholder h2 {
+            font-weight: 400;
+            font-size: 20px;
+            margin-bottom: 4px;
+        }
+        .welcome-placeholder p {
+            font-size: 14px;
+        }
+
+        .chat-footer {
+            padding: 8px 20px;
+            border-top: 1px solid rgba(0,0,0,0.04);
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #7a7a9a;
+            background: #fafbfc;
+        }
+        .chat-footer .limit-info {
+            display: flex;
+            gap: 16px;
+        }
+        .chat-footer .limit-info span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .explanation-section {
+            max-width: 1300px;
+            margin: 0 auto 40px;
+            padding: 0 20px;
+            text-align: center;
+        }
+        .explanation-section h2 {
+            font-size: 32px;
+            font-weight: 300;
+            margin-bottom: 12px;
+            background: linear-gradient(135deg, #4a6cf7, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .explanation-section p {
+            max-width: 700px;
+            margin: 0 auto 20px;
+            color: #5a5a7a;
+            font-size: 18px;
+            line-height: 1.7;
+        }
+        .explanation-section .features {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 30px;
+            margin-top: 20px;
+        }
+        .explanation-section .feature-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #1a1a2e;
+            font-size: 15px;
+        }
+        .explanation-section .feature-item .icon {
+            font-size: 22px;
+        }
+
+        .pricing-section {
+            max-width: 1300px;
+            margin: 0 auto 60px;
+            padding: 0 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 24px;
+        }
+        .pricing-card {
+            background: #ffffff;
+            border-radius: 24px;
+            padding: 28px 24px 32px;
+            width: 280px;
+            text-align: center;
+            border: 1px solid rgba(0,0,0,0.06);
+            transition: 0.3s;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.04);
+        }
+        .pricing-card:hover {
+            transform: translateY(-6px);
+            border-color: #4a6cf7;
+            box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+        }
+        .pricing-card.pro {
+            border-color: #4a6cf7;
+            background: rgba(74,108,247,0.02);
+        }
+        .pricing-card .plan-name {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+        .pricing-card .plan-price {
+            font-size: 36px;
+            font-weight: 700;
+            margin: 12px 0 8px;
+            color: #1a1a2e;
+        }
+        .pricing-card .plan-price span {
+            font-size: 16px;
+            font-weight: 400;
+            color: #7a7a9a;
+        }
+        .pricing-card ul {
+            list-style: none;
+            margin: 16px 0 24px;
+            text-align: left;
+            color: #5a5a7a;
+            font-size: 14px;
+            line-height: 2;
+        }
+        .pricing-card ul li::before {
+            content: "✓ ";
+            color: #4a6cf7;
+        }
+        .pricing-card .btn {
+            display: inline-block;
+            padding: 10px 32px;
+            border-radius: 40px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+            text-decoration: none;
+        }
+        .pricing-card .btn-primary {
+            background: linear-gradient(135deg, #4a6cf7, #a855f7);
+            color: #fff;
+        }
+        .pricing-card .btn-primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(74,108,247,0.3);
+        }
+        .pricing-card .btn-secondary {
+            background: rgba(0,0,0,0.04);
+            color: #1a1a2e;
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+        .pricing-card .btn-secondary:hover {
+            background: rgba(0,0,0,0.08);
+        }
+
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            padding: 12px 20px;
+            border-radius: 14px;
+            background: #1a1a2e;
+            backdrop-filter: blur(8px);
+            border-left: 4px solid #4a6cf7;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            font-size: 14px;
+            color: #fff;
+            animation: slideIn 0.3s ease;
+        }
+        .toast.success { border-left-color: #2ecc71; }
+        .toast.warning { border-left-color: #f1c40f; }
+        .toast.error { border-left-color: #e74c3c; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal {
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 32px;
+            max-width: 440px;
+            width: 90%;
+            border: 1px solid rgba(0,0,0,0.04);
+            box-shadow: 0 12px 60px rgba(0,0,0,0.12);
+        }
+        .modal h2 {
+            font-weight: 400;
+            margin-bottom: 20px;
+            color: #1a1a2e;
+        }
+        .modal label {
+            display: block;
+            font-size: 13px;
+            color: #5a5a7a;
+            margin: 12px 0 4px;
+        }
+        .modal input, .modal select, .modal textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: #fafbfc;
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 12px;
+            color: #1a1a2e;
+            outline: none;
+            font-size: 14px;
+        }
+        .modal input:focus, .modal select:focus, .modal textarea:focus {
+            border-color: #4a6cf7;
+        }
+        .modal textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+        .modal .avatar-preview {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: #f1f3f8;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            color: #aaa;
+            margin: 8px auto;
+            overflow: hidden;
+            border: 2px dashed #ccc;
+        }
+        .modal .avatar-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .modal .file-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 4px;
+        }
+        .modal .file-input-wrapper label {
+            background: #f1f3f8;
+            padding: 6px 16px;
+            border-radius: 40px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #1a1a2e;
+            margin: 0;
+        }
+        .modal .file-input-wrapper input[type="file"] {
+            display: none;
+        }
+        .modal .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        .modal .modal-actions .btn {
+            padding: 8px 24px;
+            border-radius: 40px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .modal .modal-actions .btn-primary {
+            background: linear-gradient(135deg, #4a6cf7, #a855f7);
+            color: #fff;
+        }
+        .modal .modal-actions .btn-secondary {
+            background: #f1f3f8;
+            color: #1a1a2e;
+        }
+        .modal .switch-link {
+            color: #4a6cf7;
+            cursor: pointer;
+            font-size: 14px;
+            margin-top: 16px;
+            display: inline-block;
+        }
+
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 260px;
+            }
+        }
+        @media (max-width: 600px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                width: 280px;
+                z-index: 100;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                border-right: 1px solid rgba(0,0,0,0.04);
+                background: #fafbfc;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .messenger {
+                height: 480px;
+            }
+            .chat-header .chat-actions button {
+                padding: 2px 10px;
+                font-size: 11px;
+            }
+            .message {
+                max-width: 85%;
+            }
+            .global-header .brand {
+                font-size: 22px;
+            }
+            .global-header .auth-area button {
+                font-size: 12px;
+                padding: 4px 12px;
+            }
+            .pricing-card {
+                width: 100%;
+                max-width: 300px;
+            }
+        }
+        .sidebar-toggle {
+            display: none;
+            background: none;
+            border: none;
+            color: #1a1a2e;
+            font-size: 22px;
+            cursor: pointer;
+            padding: 0 6px;
+        }
+        @media (max-width: 600px) {
+            .sidebar-toggle {
+                display: inline-block;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- ========== GLOBAL HEADER ========== -->
+    <header class="global-header">
+        <span class="brand">🌿 Aura</span>
+        <div class="auth-area">
+            <span class="email" id="headerEmail"></span>
+            <span class="pro-badge" id="headerProBadge">Free</span>
+            <button class="logout-btn" id="headerLogout" style="display:none;">Logout</button>
+            <button id="headerLogin">Login</button>
+            <button id="headerSignup">Sign Up</button>
+            <a href="/dashboard" class="account-link" id="accountLink" style="display:none;">Account</a>
+        </div>
+    </header>
+
+    <!-- ========== MESSENGER ========== -->
+    <div class="messenger">
+
+        <!-- SIDEBAR -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span style="font-weight:500;">Companions</span>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span class="companion-count" id="companionCount"></span>
+                    <button class="new-btn" id="createBtnSidebar">+ New</button>
+                </div>
+            </div>
+            <div class="sidebar-search">
+                <input type="text" placeholder="Search..." id="searchInput" />
+            </div>
+            <div class="companion-list" id="companionList">
+                <!-- JS populates -->
+            </div>
+            <!-- Referral section -->
+            <div class="sidebar-referral">
+                <div class="ref-title">
+                    🔗 Referral
+                    <span class="info-icon" id="referralInfoIcon">ℹ️</span>
+                    <div class="ref-tooltip" id="referralTooltip">
+                        <strong>How it works:</strong><br>
+                        Share your referral code. When a friend signs up with it, both of you get <strong>100 bonus messages</strong>!
+                    </div>
+                </div>
+                <div class="ref-row">
+                    <code class="ref-code" id="referralCodeDisplay">------</code>
+                    <button class="btn btn-secondary ref-btn" id="copyReferralBtn">Copy</button>
+                </div>
+                <div class="bonus-info">Bonus messages: <span id="bonusMessagesDisplay">0</span></div>
+            </div>
+        </div>
+
+        <!-- CHAT AREA -->
+        <div class="chat-area">
+            <div class="chat-header">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <button class="sidebar-toggle" id="sidebarToggle">☰</button>
+                    <div class="companion-info">
+                        <div class="avatar" id="chatAvatar">🧘</div>
+                        <div>
+                            <span class="name" id="chatName">Select a companion</span>
+                            <span class="traits" id="chatTraits"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="chat-actions">
+                    <button id="shareBtn">🔗 Share</button>
+                    <button id="newSessionBtn">➕ New</button>
+                </div>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-placeholder" id="welcomePlaceholder">
+                    <div class="icon">💬</div>
+                    <h2>Welcome to Aura</h2>
+                    <p>Choose a companion from the sidebar to start chatting.</p>
+                </div>
+            </div>
+            <div class="chat-input-area">
+                <input type="text" id="userInput" placeholder="Type a message..." autocomplete="off" />
+                <button id="sendBtn">Send</button>
+            </div>
+            <div class="chat-footer">
+                <div class="limit-info">
+                    <span id="messageLimitDisplay">📨 -- / -- messages</span>
+                    <span id="companionLimitDisplay">🧑‍🤝‍🧑 -- / -- companions</span>
+                    <span id="bonusDisplay">🎁 Bonus: 0</span>
+                </div>
+                <span id="proStatusDisplay">Free</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== EXPLANATION SECTION ========== -->
+    <section class="explanation-section">
+        <h2>What is Aura?</h2>
+        <p>
+            Aura is a private, AI‑powered companion that adapts to you. Create multiple companions with distinct personalities, tones, and backstories. Chat about anything – your day, your thoughts, or your ideas. Every conversation is saved and can be shared with a simple link.
+        </p>
+        <div class="features">
+            <span class="feature-item"><span class="icon">🧠</span> Personalized personalities</span>
+            <span class="feature-item"><span class="icon">🔒</span> Private & secure</span>
+            <span class="feature-item"><span class="icon">🔗</span> Shareable sessions</span>
+            <span class="feature-item"><span class="icon">🔄</span> Always evolving</span>
+        </div>
+    </section>
+
+    <!-- ========== PRICING SECTION ========== -->
+    <section class="pricing-section" id="pricing">
+        <div class="pricing-card">
+            <div class="plan-name">Free</div>
+            <div class="plan-price">$0 <span>/mo</span></div>
+            <ul>
+                <li>2 companions</li>
+                <li>10 messages per day</li>
+                <li>Basic personalities</li>
+                <li>Share sessions</li>
+            </ul>
+            <button class="btn btn-secondary" id="pricingFree">Current Plan</button>
+        </div>
+        <div class="pricing-card pro">
+            <div class="plan-name">Elite</div>
+            <div class="plan-price">$9.99 <span>/mo</span></div>
+            <ul>
+                <li>Unlimited companions</li>
+                <li>1,000 messages per month</li>
+                <li>All personalities & tones</li>
+                <li>Priority support</li>
+            </ul>
+            <button class="btn btn-primary" id="pricingElite">Upgrade to Elite</button>
+        </div>
+        <div class="pricing-card pro">
+            <div class="plan-name">Pro</div>
+            <div class="plan-price">$19.99 <span>/mo</span></div>
+            <ul>
+                <li>Unlimited companions</li>
+                <li>10,000 messages per month</li>
+                <li>All personalities & tones</li>
+                <li>Priority support</li>
+                <li>Export conversations</li>
+            </ul>
+            <button class="btn btn-primary" id="pricingPro">Upgrade to Pro</button>
+        </div>
+    </section>
+
+    <!-- ========== HIDDEN ELEMENT FOR INITIAL MESSAGES (shared sessions) ========== -->
+    <script id="initialMessages" type="application/json">[]</script>
+
+    <!-- ========== MODALS ========== -->
+    <!-- Auth Modal -->
+    <div class="modal-overlay" id="authModal">
+        <div class="modal">
+            <h2 id="authTitle">Login</h2>
+            <form id="authForm">
+                <input type="email" id="authEmail" placeholder="Email" required />
+                <input type="password" id="authPassword" placeholder="Password" required />
+                <input type="text" id="authReferral" placeholder="Referral code (optional)" style="margin-top:8px;" />
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('authModal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="authSubmit">Login</button>
+                </div>
+            </form>
+            <span class="switch-link" id="authSwitch">Don't have an account? Sign up</span>
+        </div>
+    </div>
+
+    <!-- Create/Edit Companion Modal -->
+    <div class="modal-overlay" id="createModal">
+        <div class="modal">
+            <h2 id="createModalTitle">Create Companion</h2>
+            <label>Name</label>
+            <input type="text" id="compName" placeholder="e.g., Alex" value="" />
+            <label>Avatar</label>
+            <div class="avatar-preview" id="avatarPreview">
+                <span>📷</span>
+            </div>
+            <div class="file-input-wrapper">
+                <label for="avatarUpload">Choose image</label>
+                <input type="file" id="avatarUpload" accept="image/*" />
+                <button class="btn btn-secondary" style="padding:4px 12px; font-size:12px;" id="clearAvatarBtn">Clear</button>
+            </div>
+            <label>Personality</label>
+            <select id="compPersonality">
+                <option value="empathetic">Empathetic</option>
+                <option value="logical">Logical</option>
+                <option value="playful">Playful</option>
+                <option value="wise">Wise</option>
+            </select>
+            <label>Tone</label>
+            <select id="compTone">
+                <option value="warm">Warm</option>
+                <option value="formal">Formal</option>
+                <option value="casual">Casual</option>
+            </select>
+            <label>Description (optional)</label>
+            <textarea id="compDescription" placeholder="A short backstory..."></textarea>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('createModal')">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveCompanionBtn">Create</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Modal -->
+    <div class="modal-overlay" id="shareModal">
+        <div class="modal">
+            <h2>Share Session</h2>
+            <p style="color:#5a5a7a;margin-bottom:12px;">Anyone with this link can view (read‑only).</p>
+            <input type="text" id="shareLink" readonly style="width:100%;padding:12px;border-radius:12px;background:#fafbfc;border:1px solid rgba(0,0,0,0.06);color:#1a1a2e;" />
+            <div class="modal-actions">
+                <button class="btn btn-secondary" onclick="copyShareLink()">Copy</button>
+                <button class="btn btn-secondary" onclick="closeModal('shareModal')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ============================================================
+        //  STATE
+        // ============================================================
+        let currentCompanionId = null;
+        let currentSessionId = null;
+        let companions = [];
+        let isLoggedIn = false;
+        let currentUserEmail = '';
+        let usageData = {
+            plan: 'free',
+            daily_used: 0,
+            daily_limit: 10,
+            monthly_used: 0,
+            monthly_limit: null,
+            bonus_messages: 0,
+            companion_count: 0,
+            max_companions: 2,
+            is_pro: false
+        };
+        let initialMessages = null;
+        let avatarDataUrl = null;
+
+        const colors = ['#4a6cf7', '#a855f7', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
+
+        // ---------- MOCK COMPANIONS ----------
+        const mockCompanions = [
+            { id: 'mock1', name: 'Alex', avatar: null, personality: 'empathetic', tone: 'warm', description: 'A calm listener who helps you reflect.' },
+            { id: 'mock2', name: 'Jordan', avatar: null, personality: 'logical', tone: 'formal', description: 'Clear‑headed and solution‑focused.' },
+            { id: 'mock3', name: 'Taylor', avatar: null, personality: 'playful', tone: 'casual', description: 'Cheerful, witty, and uplifting.' },
+            { id: 'mock4', name: 'Morgan', avatar: null, personality: 'wise', tone: 'warm', description: 'Thoughtful, patient, and insightful.' },
+            { id: 'mock5', name: 'Riley', avatar: null, personality: 'empathetic', tone: 'casual', description: 'Grounded, supportive, and kind.' },
+            { id: 'mock6', name: 'Casey', avatar: null, personality: 'logical', tone: 'warm', description: 'Analytical but approachable.' },
+            { id: 'mock7', name: 'Quinn', avatar: null, personality: 'playful', tone: 'casual', description: 'Creative, energetic, and encouraging.' },
+            { id: 'mock8', name: 'Avery', avatar: null, personality: 'wise', tone: 'formal', description: 'Deep, thoughtful, and measured.' },
+            { id: 'mock9', name: 'Drew', avatar: null, personality: 'empathetic', tone: 'warm', description: 'Adventurous and open‑minded.' },
+            { id: 'mock10', name: 'Sage', avatar: null, personality: 'wise', tone: 'warm', description: 'A gentle guide with a calm presence.' },
+        ];
+
+        // DOM refs
+        const companionList = document.getElementById('companionList');
+        const chatMessages = document.getElementById('chatMessages');
+        const chatAvatar = document.getElementById('chatAvatar');
+        const chatName = document.getElementById('chatName');
+        const chatTraits = document.getElementById('chatTraits');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const headerEmail = document.getElementById('headerEmail');
+        const headerProBadge = document.getElementById('headerProBadge');
+        const headerLogout = document.getElementById('headerLogout');
+        const headerLogin = document.getElementById('headerLogin');
+        const headerSignup = document.getElementById('headerSignup');
+        const accountLink = document.getElementById('accountLink');
+        const createBtnSidebar = document.getElementById('createBtnSidebar');
+        const companionCount = document.getElementById('companionCount');
+        const messageLimitDisplay = document.getElementById('messageLimitDisplay');
+        const companionLimitDisplay = document.getElementById('companionLimitDisplay');
+        const proStatusDisplay = document.getElementById('proStatusDisplay');
+
+        // Referral tooltip
+        const infoIcon = document.getElementById('referralInfoIcon');
+        const tooltip = document.getElementById('referralTooltip');
+
+        // ============================================================
+        //  TOOLTIP LOGIC
+        // ============================================================
+        infoIcon.addEventListener('mouseenter', () => tooltip.classList.add('visible'));
+        infoIcon.addEventListener('mouseleave', () => tooltip.classList.remove('visible'));
+        infoIcon.addEventListener('click', () => tooltip.classList.toggle('visible'));
+        document.addEventListener('click', (e) => {
+            if (!infoIcon.contains(e.target) && !tooltip.contains(e.target)) {
+                tooltip.classList.remove('visible');
+            }
+        });
+
+        // ============================================================
+        //  TOAST
+        // ============================================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        // ============================================================
+        //  MODALS
+        // ============================================================
+        function openModal(id) { document.getElementById(id).classList.add('active'); }
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        // ============================================================
+        //  AVATAR HELPERS
+        // ============================================================
+        function getInitials(name) {
+            return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+        }
+        function getColorFromName(name) {
+            let hash = 0;
+            for (let i = 0; i < name.length; i++) {
+                hash = name.charCodeAt(i) + ((hash << 5) - hash);
+            }
+            const index = Math.abs(hash) % colors.length;
+            return colors[index];
+        }
+        function avatarHTML(avatarData, name, size = 36) {
+            if (avatarData && avatarData.startsWith('data:image')) {
+                return `<img src="${avatarData}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;" />`;
+            } else {
+                const initials = getInitials(name);
+                const color = getColorFromName(name);
+                return `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};display:flex;align-items:center;justify-content:center;color:#fff;font-weight:600;font-size:${size*0.4}px;">${initials}</div>`;
+            }
+        }
+
+        // ============================================================
+        //  USAGE API
+        // ============================================================
+        async function fetchUsage() {
+            if (!isLoggedIn) return;
+            try {
+                const resp = await fetch('/api/usage');
+                const data = await resp.json();
+                usageData = data;
+                updateUsageUI();
+            } catch (err) {
+                console.error('Usage fetch error', err);
+            }
+        }
+
+        function updateUsageUI() {
+            const {
+                plan,
+                daily_used,
+                daily_limit,
+                monthly_used,
+                monthly_limit,
+                bonus_messages,
+                companion_count,
+                max_companions,
+                is_pro
+            } = usageData;
+
+            headerProBadge.textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
+            proStatusDisplay.textContent = plan.charAt(0).toUpperCase() + plan.slice(1);
+
+            if (plan === 'free') {
+                messageLimitDisplay.textContent = `📨 ${daily_used} / ${daily_limit} messages today`;
+            } else {
+                messageLimitDisplay.textContent = `📨 ${monthly_used} / ${monthly_limit} messages this month`;
+            }
+
+            companionLimitDisplay.textContent = `🧑‍🤝‍🧑 ${companion_count} / ${max_companions} companions`;
+            document.getElementById('bonusDisplay').textContent = `🎁 Bonus: ${bonus_messages || 0}`;
+            document.getElementById('bonusMessagesDisplay').textContent = bonus_messages || 0;
+
+            if (is_pro || companion_count < max_companions) {
+                createBtnSidebar.disabled = false;
+                createBtnSidebar.textContent = '+ New';
+            } else {
+                createBtnSidebar.disabled = true;
+                createBtnSidebar.textContent = 'Limit reached';
+            }
+            companionCount.textContent = `${companion_count}/${max_companions}`;
+        }
+
+        // ============================================================
+        //  REFERRAL INFO
+        // ============================================================
+        async function fetchReferralInfo() {
+            if (!isLoggedIn) return;
+            try {
+                const resp = await fetch('/api/referral');
+                const data = await resp.json();
+                document.getElementById('referralCodeDisplay').textContent = data.referral_code || '------';
+                window.referralLink = data.referral_link || '';
+            } catch (e) {}
+        }
+
+        document.getElementById('copyReferralBtn').addEventListener('click', function() {
+            const code = document.getElementById('referralCodeDisplay').textContent;
+            if (code && code !== '------') {
+                navigator.clipboard.writeText(code).then(() => {
+                    showToast('Referral code copied!', 'success');
+                });
+            }
+        });
+
+        // ============================================================
+        //  AUTH
+        // ============================================================
+        function updateAuthUI() {
+            if (isLoggedIn) {
+                headerEmail.textContent = currentUserEmail;
+                headerLogout.style.display = 'inline';
+                headerLogin.style.display = 'none';
+                headerSignup.style.display = 'none';
+                accountLink.style.display = 'inline';
+                createBtnSidebar.style.display = 'inline';
+                fetchUsage();
+                fetchReferralInfo();
+            } else {
+                headerEmail.textContent = '';
+                headerProBadge.textContent = 'Free';
+                headerLogout.style.display = 'none';
+                headerLogin.style.display = 'inline';
+                headerSignup.style.display = 'inline';
+                accountLink.style.display = 'none';
+                createBtnSidebar.style.display = 'none';
+                messageLimitDisplay.textContent = '📨 -- / -- messages';
+                companionLimitDisplay.textContent = '🧑‍🤝‍🧑 -- / -- companions';
+                proStatusDisplay.textContent = '';
+                companionCount.textContent = '';
+                document.getElementById('bonusDisplay').textContent = '🎁 Bonus: 0';
+                document.getElementById('bonusMessagesDisplay').textContent = '0';
+                document.getElementById('referralCodeDisplay').textContent = '------';
+            }
+            renderCompanions();
+        }
+
+        async function login(email, password) {
+            const fd = new FormData();
+            fd.append('email', email);
+            fd.append('password', password);
+            const resp = await fetch('/login', { method: 'POST', body: fd });
+            if (resp.redirected) {
+                isLoggedIn = true;
+                currentUserEmail = email;
+                updateAuthUI();
+                closeModal('authModal');
+                showToast('Welcome back!', 'success');
+                loadCompanions();
+                return true;
+            } else {
+                showToast('Invalid credentials.', 'error');
+                return false;
+            }
+        }
+
+        async function signup(email, password) {
+            const fd = new FormData();
+            fd.append('email', email);
+            fd.append('password', password);
+            const refCode = document.getElementById('authReferral')?.value || '';
+            if (refCode) fd.append('referral_code', refCode);
+            const resp = await fetch('/signup', { method: 'POST', body: fd });
+            if (resp.redirected) {
+                showToast('Account created! Please login.', 'success');
+                return true;
+            } else {
+                showToast('Signup failed.', 'error');
+                return false;
+            }
+        }
+
+        function logout() {
+            fetch('/logout');
+            isLoggedIn = false;
+            currentUserEmail = '';
+            updateAuthUI();
+            showToast('Logged out.', 'info');
+            if (currentCompanionId) {
+                chatMessages.innerHTML = `<div class="welcome-placeholder">
+                    <div class="icon">💬</div>
+                    <h2>Welcome to Aura</h2>
+                    <p>Choose a companion from the sidebar to start chatting.</p>
+                </div>`;
+                chatName.textContent = 'Select a companion';
+                chatAvatar.innerHTML = '🧘';
+                chatTraits.textContent = '';
+                currentCompanionId = null;
+                currentSessionId = null;
+                userInput.disabled = true;
+                sendBtn.disabled = true;
+            }
+        }
+
+        // ============================================================
+        //  COMPANIONS
+        // ============================================================
+        async function loadCompanions() {
+            if (!isLoggedIn) {
+                renderCompanions();
+                return;
+            }
+            try {
+                const resp = await fetch('/api/companions');
+                if (!resp.ok) {
+                    if (resp.status === 401) { logout(); return; }
+                    throw new Error('Failed to load companions');
+                }
+                const data = await resp.json();
+                companions = data;
+                renderCompanions();
+                fetchUsage();
+            } catch (err) {
+                showToast(err.message, 'error');
+                renderCompanions();
+            }
+        }
+
+        function renderCompanions() {
+            companionList.innerHTML = '';
+            let list = isLoggedIn ? companions : mockCompanions;
+
+            if (list.length === 0 && isLoggedIn) {
+                companionList.innerHTML = `<div style="padding:20px;text-align:center;color:#7a7a9a;font-size:14px;">No companions yet. Create one!</div>`;
+                return;
+            }
+
+            list.forEach(comp => {
+                const item = document.createElement('div');
+                item.className = 'companion-item';
+                if (!isLoggedIn) item.classList.add('mock');
+                if (comp.id === currentCompanionId) item.classList.add('active');
+                const isMock = !isLoggedIn;
+
+                const avatarData = comp.avatar || null;
+                const name = comp.name || 'Unknown';
+                const avatarHtml = avatarHTML(avatarData, name, 36);
+
+                item.innerHTML = `
+                    <div class="avatar">${avatarHtml}</div>
+                    <div class="info">
+                        <div class="name">${name} ${isMock ? '<span class="mock-badge">demo</span>' : ''}</div>
+                        <div class="preview">${comp.description || 'Click to chat'}</div>
+                    </div>
+                    ${!isMock ? `<button class="delete-btn" data-id="${comp.id}">✕</button>` : ''}
+                `;
+                if (!isMock) {
+                    item.querySelector('.delete-btn').addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        if (!confirm(`Delete "${name}"?`)) return;
+                        await fetch(`/api/companion/${comp.id}`, { method: 'DELETE' });
+                        loadCompanions();
+                        if (currentCompanionId === comp.id) {
+                            chatMessages.innerHTML = `<div class="welcome-placeholder">
+                                <div class="icon">💬</div>
+                                <h2>Welcome to Aura</h2>
+                                <p>Choose a companion from the sidebar to start chatting.</p>
+                            </div>`;
+                            chatName.textContent = 'Select a companion';
+                            chatAvatar.innerHTML = '🧘';
+                            chatTraits.textContent = '';
+                            currentCompanionId = null;
+                            currentSessionId = null;
+                            userInput.disabled = true;
+                            sendBtn.disabled = true;
+                        }
+                    });
+                }
+                item.addEventListener('click', () => {
+                    if (isMock) {
+                        showToast('Login to chat with real companions.', 'warning');
+                        return;
+                    }
+                    selectCompanion(comp.id);
+                });
+                companionList.appendChild(item);
+            });
+        }
+
+        async function selectCompanion(id) {
+            const comp = companions.find(c => c.id === id);
+            if (!comp) { showToast('Companion not found.', 'error'); return; }
+            currentCompanionId = id;
+            chatName.textContent = comp.name;
+            const avatarData = comp.avatar || null;
+            chatAvatar.innerHTML = avatarHTML(avatarData, comp.name, 32);
+            chatTraits.textContent = `${comp.personality} · ${comp.tone}`;
+            userInput.disabled = false;
+            sendBtn.disabled = false;
+            chatMessages.innerHTML = '';
+            await createNewSession(id);
+            renderCompanions();
+            if (window.innerWidth <= 600) {
+                document.getElementById('sidebar').classList.remove('open');
+            }
+        }
+
+        // ============================================================
+        //  SESSIONS & CHAT
+        // ============================================================
+        async function createNewSession(companionId) {
+            try {
+                const resp = await fetch('/api/session', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ companion_id: companionId, title: 'New Conversation' })
+                });
+                const data = await resp.json();
+                if (data.error) { showToast(data.error, 'warning'); return; }
+                currentSessionId = data.session_id;
+                history.pushState({}, '', `/s/${data.session_id}`);
+                const comp = companions.find(c => c.id === companionId);
+                appendMessage('assistant', `💬 Hello! I'm ${comp.name}. How can I support you today?`);
+                fetchUsage();
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        function appendMessage(role, content) {
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            div.innerHTML = `${content} <span class="time">${time}</span>`;
+            chatMessages.appendChild(div);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            const welcome = document.querySelector('.welcome-placeholder');
+            if (welcome) welcome.style.display = 'none';
+        }
+
+        async function sendMessage() {
+            const msg = userInput.value.trim();
+            if (!msg) return;
+            if (!currentSessionId) { showToast('Select a companion first.', 'warning'); return; }
+            userInput.value = '';
+            appendMessage('user', msg);
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+            try {
+                const resp = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: msg, session_id: currentSessionId })
+                });
+                const data = await resp.json();
+                if (data.error) {
+                    appendMessage('assistant', '⚠️ ' + data.error);
+                    showToast(data.error, 'warning');
+                    return;
+                }
+                appendMessage('assistant', data.reply);
+                fetchUsage();
+            } catch (err) {
+                appendMessage('assistant', '❌ ' + err.message);
+            } finally {
+                userInput.disabled = false;
+                sendBtn.disabled = false;
+                userInput.focus();
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendMessage(); });
+
+        // ============================================================
+        //  SHARE
+        // ============================================================
+        document.getElementById('shareBtn').addEventListener('click', () => {
+            if (!currentSessionId) { showToast('No active session.', 'warning'); return; }
+            const shareUrl = window.location.origin + '/s/' + currentSessionId;
+            document.getElementById('shareLink').value = shareUrl;
+            openModal('shareModal');
+        });
+
+        function copyShareLink() {
+            const input = document.getElementById('shareLink');
+            input.select();
+            navigator.clipboard.writeText(input.value);
+            showToast('Link copied!', 'success');
+            closeModal('shareModal');
+        }
+
+        // ============================================================
+        //  NEW SESSION
+        // ============================================================
+        document.getElementById('newSessionBtn').addEventListener('click', async () => {
+            if (!currentCompanionId) { showToast('No companion selected.', 'warning'); return; }
+            chatMessages.innerHTML = '';
+            await createNewSession(currentCompanionId);
+        });
+
+        // ============================================================
+        //  CREATE / EDIT
+        // ============================================================
+        function openCreateModal() {
+            if (!isLoggedIn) { showToast('Please login first.', 'warning'); return; }
+            if (!usageData.is_pro && usageData.companion_count >= usageData.max_companions) {
+                showToast('You have reached the limit of 2 companions. Upgrade to Elite or Pro.', 'warning');
+                return;
+            }
+            document.getElementById('createModalTitle').textContent = 'Create Companion';
+            document.getElementById('saveCompanionBtn').textContent = 'Create';
+            document.getElementById('saveCompanionBtn').dataset.editId = '';
+            document.getElementById('compName').value = '';
+            document.getElementById('compPersonality').value = 'empathetic';
+            document.getElementById('compTone').value = 'warm';
+            document.getElementById('compDescription').value = '';
+            avatarDataUrl = null;
+            document.getElementById('avatarPreview').innerHTML = '<span>📷</span>';
+            document.getElementById('avatarUpload').value = '';
+            openModal('createModal');
+        }
+
+        document.getElementById('createBtnSidebar').addEventListener('click', openCreateModal);
+
+        function openEditModal(compId) {
+            const comp = companions.find(c => c.id === compId);
+            if (!comp) return;
+            document.getElementById('createModalTitle').textContent = 'Edit Companion';
+            document.getElementById('saveCompanionBtn').textContent = 'Update';
+            document.getElementById('saveCompanionBtn').dataset.editId = compId;
+            document.getElementById('compName').value = comp.name;
+            document.getElementById('compPersonality').value = comp.personality;
+            document.getElementById('compTone').value = comp.tone;
+            document.getElementById('compDescription').value = comp.description || '';
+            if (comp.avatar) {
+                avatarDataUrl = comp.avatar;
+                document.getElementById('avatarPreview').innerHTML = `<img src="${comp.avatar}" />`;
+            } else {
+                avatarDataUrl = null;
+                document.getElementById('avatarPreview').innerHTML = '<span>📷</span>';
+            }
+            document.getElementById('avatarUpload').value = '';
+            openModal('createModal');
+        }
+
+        document.getElementById('avatarUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                avatarDataUrl = ev.target.result;
+                document.getElementById('avatarPreview').innerHTML = `<img src="${avatarDataUrl}" />`;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        document.getElementById('clearAvatarBtn').addEventListener('click', function() {
+            avatarDataUrl = null;
+            document.getElementById('avatarPreview').innerHTML = '<span>📷</span>';
+            document.getElementById('avatarUpload').value = '';
+        });
+
+        document.getElementById('saveCompanionBtn').addEventListener('click', async () => {
+            const name = document.getElementById('compName').value.trim() || 'Companion';
+            const personality = document.getElementById('compPersonality').value;
+            const tone = document.getElementById('compTone').value;
+            const description = document.getElementById('compDescription').value.trim();
+            const editId = document.getElementById('saveCompanionBtn').dataset.editId;
+
+            const body = { name, avatar: avatarDataUrl, personality, tone, description };
+            const url = editId ? `/api/companion/${editId}` : '/api/companion';
+            const method = editId ? 'PUT' : 'POST';
+            try {
+                const resp = await fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await resp.json();
+                if (data.error) { showToast(data.error, 'warning'); return; }
+                closeModal('createModal');
+                showToast(editId ? 'Companion updated!' : 'Companion created!', 'success');
+                loadCompanions();
+                if (editId && currentCompanionId == editId) {
+                    const comp = companions.find(c => c.id === editId);
+                    if (comp) {
+                        chatName.textContent = comp.name;
+                        chatAvatar.innerHTML = avatarHTML(comp.avatar || null, comp.name, 32);
+                        chatTraits.textContent = `${comp.personality} · ${comp.tone}`;
+                    }
+                    chatMessages.innerHTML = '';
+                    await createNewSession(editId);
+                }
+            } catch (err) { showToast(err.message, 'error'); }
+        });
+
+        // ============================================================
+        //  AUTH MODAL LOGIC
+        // ============================================================
+        document.getElementById('authForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            const isLogin = document.getElementById('authSubmit').textContent === 'Login';
+            if (isLogin) {
+                await login(email, password);
+            } else {
+                await signup(email, password);
+            }
+        });
+
+        document.getElementById('authSwitch').addEventListener('click', () => {
+            const title = document.getElementById('authTitle');
+            const submit = document.getElementById('authSubmit');
+            const switchLink = document.getElementById('authSwitch');
+            if (title.textContent === 'Login') {
+                title.textContent = 'Sign Up';
+                submit.textContent = 'Sign Up';
+                switchLink.textContent = 'Already have an account? Login';
+            } else {
+                title.textContent = 'Login';
+                submit.textContent = 'Login';
+                switchLink.textContent = "Don't have an account? Sign up";
+            }
+        });
+
+        headerLogin.addEventListener('click', () => {
+            document.getElementById('authTitle').textContent = 'Login';
+            document.getElementById('authSubmit').textContent = 'Login';
+            openModal('authModal');
+        });
+        headerSignup.addEventListener('click', () => {
+            document.getElementById('authTitle').textContent = 'Sign Up';
+            document.getElementById('authSubmit').textContent = 'Sign Up';
+            openModal('authModal');
+        });
+        headerLogout.addEventListener('click', logout);
+
+        // ============================================================
+        //  PRICING BUTTONS (Elite & Pro)
+        // ============================================================
+        async function upgradePlan(plan) {
+            if (!isLoggedIn) { showToast('Please login first.', 'warning'); return; }
+            try {
+                const resp = await fetch('/create-checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ plan })
+                });
+                const data = await resp.json();
+                if (data.checkout_url) window.location.href = data.checkout_url;
+                else showToast('Error creating checkout.', 'error');
+            } catch (err) { showToast(err.message, 'error'); }
+        }
+
+        document.getElementById('pricingElite').addEventListener('click', () => upgradePlan('elite'));
+        document.getElementById('pricingPro').addEventListener('click', () => upgradePlan('pro'));
+        document.getElementById('pricingFree').addEventListener('click', () => {
+            showToast('You are already on the Free plan.', 'info');
+        });
+
+        // ============================================================
+        //  SIDEBAR TOGGLE
+        // ============================================================
+        document.getElementById('sidebarToggle').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('open');
+        });
+
+        // ============================================================
+        //  SEARCH
+        // ============================================================
+        document.getElementById('searchInput').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll('.companion-item').forEach(item => {
+                const name = item.querySelector('.name')?.textContent?.toLowerCase() || '';
+                item.style.display = name.includes(query) ? 'flex' : 'none';
+            });
+        });
+
+        // ============================================================
+        //  SHARED SESSION HANDLING
+        // ============================================================
+        function loadSharedSession(messages) {
+            chatMessages.innerHTML = '';
+            messages.forEach(msg => {
+                const div = document.createElement('div');
+                div.className = `message ${msg.role}`;
+                div.textContent = msg.content;
+                chatMessages.appendChild(div);
+            });
+            userInput.disabled = true;
+            sendBtn.disabled = true;
+            chatName.textContent = 'Shared Session';
+            chatAvatar.innerHTML = '🔗';
+            chatTraits.textContent = 'read‑only';
+            document.getElementById('shareBtn').style.display = 'none';
+            document.getElementById('newSessionBtn').style.display = 'none';
+            const notice = document.createElement('div');
+            notice.className = 'message assistant';
+            notice.textContent = '📌 You are viewing a shared session (read‑only).';
+            chatMessages.appendChild(notice);
+        }
+
+        // ============================================================
+        //  INIT
+        // ============================================================
+        async function init() {
+            const initMsgScript = document.getElementById('initialMessages');
+            if (initMsgScript && initMsgScript.textContent) {
+                try {
+                    initialMessages = JSON.parse(initMsgScript.textContent);
+                } catch (e) {}
+            }
+
+            try {
+                const resp = await fetch('/api/companions');
+                if (resp.status === 401) {
+                    isLoggedIn = false;
+                    updateAuthUI();
+                    if (initialMessages && initialMessages.length) {
+                        loadSharedSession(initialMessages);
+                    }
+                    return;
+                }
+                if (resp.ok) {
+                    isLoggedIn = true;
+                    currentUserEmail = 'User';
+                    updateAuthUI();
+                    await loadCompanions();
+                    if (window.location.pathname.startsWith('/s/') && initialMessages && initialMessages.length) {
+                        loadSharedSession(initialMessages);
+                    }
+                }
+            } catch (err) {
+                isLoggedIn = false;
+                updateAuthUI();
+                if (initialMessages && initialMessages.length) {
+                    loadSharedSession(initialMessages);
+                }
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>

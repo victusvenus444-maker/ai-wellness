@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Aura – Account</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet" />
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: #f4f6fb;
+            color: #1a1a2e;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 28px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+        }
+        h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            background: linear-gradient(135deg, #4a6cf7, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .sub {
+            color: #5a5a7a;
+            margin-bottom: 24px;
+            border-left: 3px solid #4a6cf7;
+            padding-left: 16px;
+        }
+        .section {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid rgba(0,0,0,0.04);
+        }
+        .section h2 {
+            font-size: 20px;
+            font-weight: 500;
+            margin-bottom: 16px;
+        }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.02);
+        }
+        .info-row .label {
+            color: #5a5a7a;
+        }
+        .info-row .value {
+            font-weight: 500;
+        }
+        .badge {
+            display: inline-block;
+            padding: 2px 14px;
+            border-radius: 40px;
+            font-size: 13px;
+            font-weight: 600;
+            background: rgba(74,108,247,0.12);
+            color: #4a6cf7;
+        }
+        .badge.pro { background: rgba(168,85,247,0.12); color: #a855f7; }
+        .badge.elite { background: rgba(168,85,247,0.12); color: #a855f7; }
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-group label {
+            display: block;
+            font-size: 14px;
+            color: #5a5a7a;
+            margin-bottom: 4px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px 14px;
+            background: #fafbfc;
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 12px;
+            color: #1a1a2e;
+            font-size: 14px;
+            outline: none;
+        }
+        .form-group input:focus {
+            border-color: #4a6cf7;
+        }
+        .btn {
+            display: inline-block;
+            padding: 10px 24px;
+            border-radius: 40px;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+            font-size: 14px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #4a6cf7, #a855f7);
+            color: #fff;
+        }
+        .btn-primary:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(74,108,247,0.3);
+        }
+        .btn-secondary {
+            background: rgba(0,0,0,0.04);
+            color: #1a1a2e;
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+        .btn-secondary:hover {
+            background: rgba(0,0,0,0.08);
+        }
+        .btn-danger {
+            background: #e74c3c;
+            color: #fff;
+        }
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+        .btn-link {
+            background: none;
+            border: none;
+            color: #4a6cf7;
+            text-decoration: underline;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn-link:hover { color: #1a1a2e; }
+        .upgrade-card {
+            background: linear-gradient(135deg, #4a6cf7, #a855f7);
+            border-radius: 20px;
+            padding: 24px 28px;
+            color: #fff;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            box-shadow: 0 8px 32px rgba(74,108,247,0.15);
+        }
+        .upgrade-card .text h3 {
+            font-weight: 600;
+            font-size: 20px;
+        }
+        .upgrade-card .text p {
+            opacity: 0.85;
+            font-size: 14px;
+            margin-top: 4px;
+        }
+        .upgrade-card .btn {
+            background: #fff;
+            color: #4a6cf7;
+        }
+        .upgrade-card .btn:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+        .danger-zone {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 8px;
+        }
+        .danger-zone h3 {
+            color: #b91c1c;
+            margin-bottom: 4px;
+        }
+        .danger-zone p {
+            color: #5a5a7a;
+            font-size: 14px;
+        }
+        .mt-16 { margin-top: 16px; }
+        .flex { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .toast-container {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .toast {
+            padding: 12px 20px;
+            border-radius: 14px;
+            background: #1a1a2e;
+            backdrop-filter: blur(8px);
+            border-left: 4px solid #4a6cf7;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.15);
+            font-size: 14px;
+            color: #fff;
+            animation: slideIn 0.3s ease;
+        }
+        .toast.success { border-left-color: #2ecc71; }
+        .toast.warning { border-left-color: #f1c40f; }
+        .toast.error { border-left-color: #e74c3c; }
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+        @media (max-width: 600px) {
+            .container { padding: 20px; }
+            .upgrade-card { flex-direction: column; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="toast-container" id="toastContainer"></div>
+
+    <div class="container">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h1>🌿 Account</h1>
+            <a href="/" class="btn btn-secondary" style="padding:6px 16px;">← Back to Companions</a>
+        </div>
+        <div class="sub">Manage your profile, plan, and settings.</div>
+
+        <!-- === User Info === -->
+        <div class="section">
+            <h2>Profile</h2>
+            <div class="info-row">
+                <span class="label">Email</span>
+                <span class="value">{{ user.email }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Plan</span>
+                <span class="value">
+                    <span class="badge {% if user.plan == 'pro' %}pro{% elif user.plan == 'elite' %}elite{% endif %}">
+                        {{ user.plan|capitalize }}
+                    </span>
+                </span>
+            </div>
+            <div class="info-row">
+                <span class="label">Referral Code</span>
+                <span class="value">{{ user.referral_code }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Bonus Messages</span>
+                <span class="value">{{ user.bonus_messages }}</span>
+            </div>
+            <div class="info-row">
+                <span class="label">Messages Used This Month</span>
+                <span class="value">
+                    {{ user.monthly_messages_used }}
+                    {% if user.plan == 'free' %}
+                        / ∞
+                    {% else %}
+                        / {{ user.monthly_limit }}
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- === Subscription / Upgrade === -->
+        <div class="section">
+            <h2>Subscription</h2>
+            {% if user.plan == 'free' %}
+                <div class="upgrade-card">
+                    <div class="text">
+                        <h3>✨ Unlock More Messages</h3>
+                        <p>Upgrade to Elite (1,000 msg/mo) or Pro (10,000 msg/mo) and get unlimited companions.</p>
+                    </div>
+                    <a href="/#pricing" class="btn">Upgrade Now</a>
+                </div>
+            {% else %}
+                <p>You are currently on the <strong>{{ user.plan|capitalize }}</strong> plan.</p>
+                <p style="color:#5a5a7a; font-size:14px; margin-top:4px;">
+                    Your subscription renews automatically each month via Lemon Squeezy.
+                </p>
+                <button class="btn-link" id="cancelSubscriptionBtn" style="color:#b91c1c; margin-top:8px;">
+                    Cancel Subscription
+                </button>
+            {% endif %}
+        </div>
+
+        <!-- === Change Password === -->
+        <div class="section">
+            <h2>Change Password</h2>
+            <form id="changePasswordForm">
+                <div class="form-group">
+                    <label for="currentPassword">Current Password</label>
+                    <input type="password" id="currentPassword" required />
+                </div>
+                <div class="form-group">
+                    <label for="newPassword">New Password</label>
+                    <input type="password" id="newPassword" required minlength="6" />
+                </div>
+                <div class="form-group">
+                    <label for="confirmPassword">Confirm New Password</label>
+                    <input type="password" id="confirmPassword" required />
+                </div>
+                <button type="submit" class="btn btn-primary">Update Password</button>
+            </form>
+        </div>
+
+        <!-- === Danger Zone === -->
+        <div class="section">
+            <h2>Danger Zone</h2>
+            <div class="danger-zone">
+                <h3>Delete Account</h3>
+                <p>Once you delete your account, all your companions, conversations, and data will be permanently removed. This action cannot be undone.</p>
+                <button class="btn btn-danger mt-16" id="deleteAccountBtn">Delete My Account</button>
+            </div>
+        </div>
+
+        <div style="margin-top:24px; text-align:center;">
+            <a href="/" class="btn btn-secondary" style="padding:6px 16px;">← Back to Companions</a>
+        </div>
+    </div>
+
+    <script>
+        // === Toast ===
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
+        }
+
+        // === Change Password ===
+        document.getElementById('changePasswordForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const current = document.getElementById('currentPassword').value;
+            const newPw = document.getElementById('newPassword').value;
+            const confirm = document.getElementById('confirmPassword').value;
+
+            if (!current || !newPw || !confirm) {
+                showToast('Please fill in all fields.', 'warning');
+                return;
+            }
+            if (newPw !== confirm) {
+                showToast('Passwords do not match.', 'error');
+                return;
+            }
+            if (newPw.length < 6) {
+                showToast('Password must be at least 6 characters.', 'warning');
+                return;
+            }
+
+            try {
+                const resp = await fetch('/change-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ current_password: current, new_password: newPw })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('Password updated successfully!', 'success');
+                    document.getElementById('changePasswordForm').reset();
+                } else {
+                    showToast(data.error || 'Failed to update password.', 'error');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        });
+
+        // === Cancel Subscription ===
+        document.getElementById('cancelSubscriptionBtn')?.addEventListener('click', async () => {
+            if (!confirm('Are you sure you want to cancel your subscription? You will lose access to premium features.')) return;
+            try {
+                const resp = await fetch('/cancel-subscription', { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('Subscription cancelled. You will revert to Free plan.', 'success');
+                    setTimeout(() => location.reload(), 1500);
+                } else {
+                    showToast(data.error || 'Failed to cancel subscription.', 'error');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        });
+
+        // === Delete Account ===
+        document.getElementById('deleteAccountBtn').addEventListener('click', async () => {
+            if (!confirm('This action is irreversible. Are you sure you want to delete your account?')) return;
+            if (!confirm('All your companions and conversations will be permanently lost. Confirm again?')) return;
+            try {
+                const resp = await fetch('/delete-account', { method: 'POST' });
+                const data = await resp.json();
+                if (data.success) {
+                    showToast('Account deleted. You will be logged out.', 'success');
+                    setTimeout(() => window.location.href = '/', 1500);
+                } else {
+                    showToast(data.error || 'Failed to delete account.', 'error');
+                }
+            } catch (err) {
+                showToast('Error: ' + err.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
