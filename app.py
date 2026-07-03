@@ -58,7 +58,7 @@ limiter = Limiter(
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
-# ---------- RevenueCat (no Lemon Squeezy) ----------
+# ---------- RevenueCat ----------
 REVENUECAT_WEBHOOK_SECRET = os.getenv('REVENUECAT_WEBHOOK_SECRET')  # optional
 
 # ---------- Models ----------
@@ -67,7 +67,8 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     plan = db.Column(db.String(20), default='free')  # free, elite, pro
-    revenuecat_user_id = db.Column(db.String(100), nullable=True)  # link to RevenueCat
+    revenuecat_user_id = db.Column(db.String(100), nullable=True)
+    subscription_product_id = db.Column(db.String(100), nullable=True)  # store the product ID
     referral_code = db.Column(db.String(20), unique=True, nullable=False)
     bonus_messages = db.Column(db.Integer, default=0)
     referred_by = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=True)
@@ -193,7 +194,7 @@ def build_system_prompt(companion):
         base += f" Your backstory: {companion.description}"
     return base
 
-# ---------- Proactive Scheduler (unchanged) ----------
+# ---------- Proactive Scheduler ----------
 def generate_event_hash(user_id, companion_id, event_datetime, description):
     raw = f"{user_id}-{companion_id}-{event_datetime.isoformat()}-{description}"
     return hashlib.sha256(raw.encode()).hexdigest()
@@ -393,11 +394,7 @@ def get_user():
     user = User.query.get(user_id)
     return jsonify({'id': user.id, 'email': user.email, 'plan': user.plan})
 
-# ---------- Existing API routes (adapt to use jwt_required instead of login_required) ----------
-# For simplicity, we'll keep both login_required (for web) and jwt_required (for mobile).
-# We'll add @jwt_required to all /api/ routes and keep login_required for web views.
-# In this version, we'll use @jwt_required for /api/ endpoints.
-
+# ---------- API Routes ----------
 @app.route('/api/referral', methods=['GET'])
 @jwt_required()
 def get_referral_info():
@@ -620,30 +617,63 @@ def mark_proactive_read(msg_id):
     db.session.commit()
     return jsonify({'success': True})
 
-# ---------- RevenueCat Webhook ----------
+# ---------- RevenueCat Webhook (Updated for yearly support) ----------
 @app.route('/webhook/revenuecat', methods=['POST'])
 def revenuecat_webhook():
-    # Verify signature if you set a secret
-    # For now, just trust the request (or add verification later)
+    # For production, verify signature using REVENUECAT_WEBHOOK_SECRET
     data = request.json
     event = data.get('event')
-    if event == 'INITIAL_PURCHASE' or event == 'RENEWAL':
-        user_id = data.get('user_id')  # This should be the RevenueCat user ID
-        # We need to map RevenueCat user ID to our user ID.
-        # We can store revenuecat_user_id in User model.
-        # For this MVP, we'll assume the user ID is passed in the webhook.
-        # Alternatively, you can use the app_user_id field.
+
+    if event in ('INITIAL_PURCHASE', 'RENEWAL', 'NON_RENEWING_PURCHASE'):
+        # Extract app_user_id (our user ID)
         app_user_id = data.get('app_user_id')
-        if app_user_id:
-            # app_user_id should be our user's email or ID. We'll store it as our user ID.
-            user = User.query.filter_by(id=int(app_user_id)).first()
-            if user:
-                # Determine plan from entitlement
-                entitlement = data.get('entitlements', {}).get('pro', {})
-                if entitlement and entitlement.get('is_active'):
-                    user.plan = 'pro'  # or 'elite' depending on product
-                    db.session.commit()
+        if not app_user_id:
+            return jsonify({'error': 'Missing app_user_id'}), 400
+
+        try:
+            user_id = int(app_user_id)
+        except ValueError:
+            return jsonify({'error': 'Invalid app_user_id'}), 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Get product identifier from the event
+        # The event structure may vary; we'll look for product_id in the purchase details
+        product_id = None
+        # For INITIAL_PURCHASE, the product identifier is in the 'product' field.
+        # For RENEWAL, it might be in 'product' as well.
+        # We'll try to extract it from the first purchase in the 'purchases' list if available.
+        if 'purchases' in data and data['purchases']:
+            first_purchase = data['purchases'][0]
+            product_id = first_purchase.get('product_id')
+        elif 'product' in data:
+            product_id = data.get('product')
+
+        if not product_id:
+            app.logger.warning("Product ID not found in webhook payload")
+            # Fallback: assume pro
+            user.plan = 'pro'
+        else:
+            # Map product ID to plan
+            if product_id.startswith('aura_elite'):
+                user.plan = 'elite'
+            elif product_id.startswith('aura_pro'):
+                user.plan = 'pro'
+            else:
+                # Unknown product, default to pro
+                user.plan = 'pro'
+            # Store the product ID for reference
+            user.subscription_product_id = product_id
+
+        # Reset monthly usage on new purchase
+        user.monthly_messages_used = 0
+        user.month_start = date.today()
+        db.session.commit()
+        app.logger.info(f"User {user.id} plan updated to {user.plan} via webhook (product: {product_id})")
         return jsonify({'status': 'ok'}), 200
+
     return jsonify({'status': 'ignored'}), 200
 
 # ---------- Web Views (for web version, not needed for mobile) ----------
