@@ -5,7 +5,7 @@ import hmac
 import logging
 import json
 from datetime import datetime, date, timedelta
-from flask import Flask, request, render_template, session, redirect, url_for, flash, jsonify
+from flask import Flask, request, render_template, session, redirect, url_for, flash, jsonify, render_template_string
 from flask_sqlalchemy import SQLAlchemy
 from flask_bcrypt import Bcrypt
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -45,7 +45,7 @@ app.logger.setLevel(logging.INFO)
 db = SQLAlchemy(app)
 bcrypt = Bcrypt(app)
 login_manager = LoginManager(app)
-login_manager.login_view = 'login'
+login_manager.login_view = 'login_web'
 CORS(app)
 
 limiter = Limiter(
@@ -617,76 +617,351 @@ def mark_proactive_read(msg_id):
     db.session.commit()
     return jsonify({'success': True})
 
-# ---------- RevenueCat Webhook (with signature verification) ----------
-@app.route('/webhook/revenuecat', methods=['POST'])
-def revenuecat_webhook():
-    # Verify signature
-    signature = request.headers.get('X-Signature')
-    if not signature or not REVENUECAT_WEBHOOK_SECRET:
-        app.logger.warning("Missing signature or webhook secret")
-        return 'Missing signature', 400
+# ---------- NEW API ENDPOINTS (JWT) for Flutter & Account Management ----------
 
-    payload = request.data
-    expected = hmac.new(
-        REVENUECAT_WEBHOOK_SECRET.encode(),
-        payload,
-        hashlib.sha256
-    ).hexdigest()
+@app.route('/api/update-plan', methods=['POST'])
+@jwt_required()
+def update_plan():
+    """Sync user plan from RevenueCat entitlement changes (called from Flutter)."""
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    data = request.get_json()
+    new_plan = data.get('plan')
+    if new_plan not in ('free', 'elite', 'pro'):
+        return jsonify({'error': 'Invalid plan'}), 400
+    user.plan = new_plan
+    # Reset monthly usage when plan changes (optional)
+    user.monthly_messages_used = 0
+    user.month_start = date.today()
+    db.session.commit()
+    return jsonify({'success': True, 'plan': user.plan})
 
-    if not hmac.compare_digest(signature, expected):
-        app.logger.warning("Invalid webhook signature")
-        return 'Invalid signature', 401
+@app.route('/api/change-password', methods=['POST'])
+@jwt_required()
+def api_change_password():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    data = request.get_json()
+    current = data.get('current_password')
+    new_password = data.get('new_password')
+    if not current or not new_password:
+        return jsonify({'error': 'Current and new password required'}), 400
+    if not bcrypt.check_password_hash(user.password_hash, current):
+        return jsonify({'error': 'Current password is incorrect'}), 401
+    if len(new_password) < 6:
+        return jsonify({'error': 'New password must be at least 6 characters'}), 400
+    user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+    db.session.commit()
+    return jsonify({'success': True})
 
-    data = request.json
-    event = data.get('event')
+@app.route('/api/delete-account', methods=['POST'])
+@jwt_required()
+def api_delete_account():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    # Delete all related data (cascade will handle companions, sessions, messages, etc.)
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'success': True})
 
-    if event in ('INITIAL_PURCHASE', 'RENEWAL', 'NON_RENEWING_PURCHASE'):
-        app_user_id = data.get('app_user_id')
-        if not app_user_id:
-            return jsonify({'error': 'Missing app_user_id'}), 400
+@app.route('/api/cancel-subscription', methods=['POST'])
+@jwt_required()
+def api_cancel_subscription():
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+    # If using RevenueCat, you might call their API to cancel. For now, just downgrade.
+    user.plan = 'free'
+    user.subscription_product_id = None
+    user.monthly_messages_used = 0
+    user.month_start = date.today()
+    db.session.commit()
+    return jsonify({'success': True})
 
-        try:
-            user_id = int(app_user_id)
-        except ValueError:
-            return jsonify({'error': 'Invalid app_user_id'}), 400
+@app.route('/api/sessions', methods=['GET'])
+@jwt_required()
+def get_sessions():
+    """List sessions for a companion (optional)."""
+    user_id = get_jwt_identity()
+    companion_id = request.args.get('companion_id', type=int)
+    if not companion_id:
+        return jsonify({'error': 'companion_id required'}), 400
+    sessions = ChatSession.query.filter_by(user_id=user_id, companion_id=companion_id).order_by(ChatSession.created_at.desc()).all()
+    return jsonify([{
+        'id': s.id,
+        'session_id': s.session_id,
+        'title': s.title,
+        'created_at': s.created_at.isoformat(),
+        'message_count': len(s.messages)
+    } for s in sessions])
 
-        user = User.query.get(user_id)
-        if not user:
-            return jsonify({'error': 'User not found'}), 404
+# ---------- SESSION-BASED WEB AUTH (for HTML views) ----------
 
-        # Extract product_id
-        product_id = None
-        if 'purchases' in data and data['purchases']:
-            first_purchase = data['purchases'][0]
-            product_id = first_purchase.get('product_id')
-        elif 'product' in data:
-            product_id = data.get('product')
+@app.route('/login', methods=['GET', 'POST'])
+def login_web():
+    if request.method == 'GET':
+        # If user is already logged in, redirect to home
+        if current_user.is_authenticated:
+            return redirect(url_for('index'))
+        return render_template('login.html')  # optional, but we can redirect to index with login modal
+    # POST
+    email = request.form.get('email')
+    password = request.form.get('password')
+    if not email or not password:
+        flash('Email and password required', 'error')
+        return redirect(url_for('index'))
+    user = User.query.filter_by(email=email).first()
+    if not user or not bcrypt.check_password_hash(user.password_hash, password):
+        flash('Invalid credentials', 'error')
+        return redirect(url_for('index'))
+    login_user(user, remember=True)
+    flash('Logged in successfully', 'success')
+    return redirect(url_for('index'))
 
-        if product_id:
-            if product_id.startswith('aura_elite'):
-                user.plan = 'elite'
-            elif product_id.startswith('aura_pro'):
-                user.plan = 'pro'
-            else:
-                # Unknown product, default to pro
-                user.plan = 'pro'
-            user.subscription_product_id = product_id
-        else:
-            # Fallback: assume pro if entitlement is active
-            entitlement = data.get('entitlements', {}).get('pro', {})
-            if entitlement.get('is_active'):
-                user.plan = 'pro'
-            else:
-                # If no entitlement, keep current plan? But we should be safe.
-                pass
+@app.route('/signup', methods=['POST'])
+def signup_web():
+    email = request.form.get('email')
+    password = request.form.get('password')
+    referral_code = request.form.get('referral_code', '').strip().upper()
+    if not email or not password:
+        flash('Email and password required', 'error')
+        return redirect(url_for('index'))
+    if User.query.filter_by(email=email).first():
+        flash('Email already registered', 'error')
+        return redirect(url_for('index'))
+    user = User(email=email)
+    user.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+    user.referral_code = generate_referral_code()
 
-        user.monthly_messages_used = 0
-        user.month_start = date.today()
-        db.session.commit()
-        app.logger.info(f"Webhook: user {user.id} plan updated to {user.plan} (product: {product_id})")
-        return jsonify({'status': 'ok'}), 200
+    if referral_code:
+        referrer = User.query.filter_by(referral_code=referral_code).first()
+        if referrer:
+            user.referred_by = referrer.id
+            referrer.bonus_messages += 100
+            user.bonus_messages += 100
+            db.session.add(referrer)
 
-    return jsonify({'status': 'ignored'}), 200
+    db.session.add(user)
+    db.session.commit()
+
+    # Seed default companions
+    default_companions = [
+        {'name': 'Alex', 'avatar': None, 'personality': 'empathetic', 'tone': 'warm', 'description': 'A calm listener who helps you reflect.'},
+        {'name': 'Jordan', 'avatar': None, 'personality': 'logical', 'tone': 'formal', 'description': 'Clear‑headed and solution‑focused.'},
+        {'name': 'Taylor', 'avatar': None, 'personality': 'playful', 'tone': 'casual', 'description': 'Cheerful, witty, and uplifting.'},
+        {'name': 'Morgan', 'avatar': None, 'personality': 'wise', 'tone': 'warm', 'description': 'Thoughtful, patient, and insightful.'},
+        {'name': 'Riley', 'avatar': None, 'personality': 'empathetic', 'tone': 'casual', 'description': 'Grounded, supportive, and kind.'},
+        {'name': 'Casey', 'avatar': None, 'personality': 'logical', 'tone': 'warm', 'description': 'Analytical but approachable.'},
+        {'name': 'Quinn', 'avatar': None, 'personality': 'playful', 'tone': 'casual', 'description': 'Creative, energetic, and encouraging.'},
+        {'name': 'Avery', 'avatar': None, 'personality': 'wise', 'tone': 'formal', 'description': 'Deep, thoughtful, and measured.'},
+        {'name': 'Drew', 'avatar': None, 'personality': 'empathetic', 'tone': 'warm', 'description': 'Adventurous and open‑minded.'},
+        {'name': 'Sage', 'avatar': None, 'personality': 'wise', 'tone': 'warm', 'description': 'A gentle guide with a calm presence.'},
+    ]
+    for comp_data in default_companions:
+        comp = Companion(
+            user_id=user.id,
+            name=comp_data['name'],
+            avatar=comp_data['avatar'],
+            personality=comp_data['personality'],
+            tone=comp_data['tone'],
+            description=comp_data['description']
+        )
+        db.session.add(comp)
+    db.session.commit()
+
+    login_user(user, remember=True)
+    flash('Account created!', 'success')
+    return redirect(url_for('index'))
+
+@app.route('/logout')
+@login_required
+def logout_web():
+    logout_user()
+    flash('Logged out', 'info')
+    return redirect(url_for('index'))
+
+# ---------- WEB ACCOUNT MANAGEMENT (session-based) ----------
+
+@app.route('/change-password', methods=['POST'])
+@login_required
+def change_password_web():
+    current = request.form.get('current_password')
+    new_password = request.form.get('new_password')
+    if not current or not new_password:
+        flash('Both current and new password required', 'error')
+        return redirect(url_for('dashboard'))
+    if not bcrypt.check_password_hash(current_user.password_hash, current):
+        flash('Current password is incorrect', 'error')
+        return redirect(url_for('dashboard'))
+    if len(new_password) < 6:
+        flash('New password must be at least 6 characters', 'error')
+        return redirect(url_for('dashboard'))
+    current_user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+    db.session.commit()
+    flash('Password updated successfully', 'success')
+    return redirect(url_for('dashboard'))
+
+@app.route('/delete-account', methods=['POST'])
+@login_required
+def delete_account_web():
+    user = current_user
+    logout_user()
+    db.session.delete(user)
+    db.session.commit()
+    flash('Account deleted', 'info')
+    return redirect(url_for('index'))
+
+@app.route('/cancel-subscription', methods=['POST'])
+@login_required
+def cancel_subscription_web():
+    user = current_user
+    user.plan = 'free'
+    user.subscription_product_id = None
+    user.monthly_messages_used = 0
+    user.month_start = date.today()
+    db.session.commit()
+    flash('Subscription cancelled. You are now on the Free plan.', 'success')
+    return redirect(url_for('dashboard'))
+
+# ---------- CHECKOUT (for web pricing) ----------
+# This is a stub – replace with actual Lemon Squeezy / Stripe integration
+@app.route('/create-checkout', methods=['POST'])
+@login_required
+def create_checkout():
+    data = request.get_json()
+    plan = data.get('plan')
+    if plan not in ('elite', 'pro'):
+        return jsonify({'error': 'Invalid plan'}), 400
+    # For demo, we return a success message; in production, return a checkout URL
+    # Example: return jsonify({'checkout_url': 'https://example.com/checkout'})
+    # For now, we just inform the user to upgrade via the app or return a dummy URL.
+    return jsonify({
+        'checkout_url': f'https://your-payment-provider.com/checkout?plan={plan}',
+        'message': f'Checkout for {plan} plan. (Replace with actual integration.)'
+    })
+
+# ---------- SHARED SESSION VIEW (public, read-only) ----------
+@app.route('/s/<session_id>')
+def shared_session(session_id):
+    session_obj = ChatSession.query.filter_by(session_id=session_id).first()
+    if not session_obj:
+        return "Session not found", 404
+    messages = session_obj.messages.order_by(ChatMessage.created_at).all()
+    # Prepare messages for JSON serialization
+    msg_list = [{'role': m.role, 'content': m.content, 'created_at': m.created_at.isoformat()} for m in messages]
+    companion = Companion.query.get(session_obj.companion_id)
+    companion_name = companion.name if companion else "Unknown"
+    # Render a simple HTML page with the messages
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Shared Session - {companion_name}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet" />
+        <style>
+            * {{ margin:0; padding:0; box-sizing:border-box; }}
+            body {{
+                font-family: 'Inter', sans-serif;
+                background: #f4f6fb;
+                color: #1a1a2e;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+            }}
+            .container {{
+                max-width: 800px;
+                width: 100%;
+                background: #ffffff;
+                border-radius: 24px;
+                padding: 24px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.08);
+            }}
+            h1 {{
+                font-size: 24px;
+                margin-bottom: 4px;
+                background: linear-gradient(135deg, #4a6cf7, #a855f7);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+            }}
+            .sub {{
+                color: #5a5a7a;
+                margin-bottom: 20px;
+                border-left: 3px solid #4a6cf7;
+                padding-left: 12px;
+            }}
+            .message {{
+                padding: 12px 16px;
+                border-radius: 12px;
+                margin-bottom: 8px;
+                max-width: 80%;
+            }}
+            .message.user {{
+                background: #4a6cf7;
+                color: #fff;
+                align-self: flex-end;
+                margin-left: auto;
+            }}
+            .message.assistant {{
+                background: #f1f3f8;
+                color: #1a1a2e;
+                align-self: flex-start;
+            }}
+            .message .time {{
+                font-size: 10px;
+                opacity: 0.6;
+                display: block;
+                margin-top: 4px;
+            }}
+            .messages {{
+                display: flex;
+                flex-direction: column;
+            }}
+            .readonly-note {{
+                margin-top: 20px;
+                padding: 12px;
+                background: #f1f3f8;
+                border-radius: 12px;
+                text-align: center;
+                color: #5a5a7a;
+                font-size: 14px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>🔗 Shared Session</h1>
+            <div class="sub">with {companion_name} • {len(messages)} messages</div>
+            <div class="messages">
+    """
+    for msg in msg_list:
+        role = msg['role']
+        content = msg['content']
+        time_str = msg['created_at'][:16].replace('T', ' ')
+        html += f"""
+                <div class="message {role}">
+                    {content}
+                    <span class="time">{time_str}</span>
+                </div>
+        """
+    html += """
+            </div>
+            <div class="readonly-note">📌 This is a read‑only view of a shared conversation.</div>
+        </div>
+    </body>
+    </html>
+    """
+    return render_template_string(html)
 
 # ---------- Web Views (for web version) ----------
 @app.route('/')
