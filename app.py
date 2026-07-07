@@ -97,7 +97,8 @@ class Companion(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     name = db.Column(db.String(50), nullable=False)
     avatar = db.Column(db.Text, nullable=True)
-    personality = db.Column(db.String(20), default='empathetic')
+    # INCREASED to 30 to accommodate longer personality names
+    personality = db.Column(db.String(30), default='empathetic')
     tone = db.Column(db.String(20), default='warm')
     description = db.Column(db.String(200), default='')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -178,11 +179,20 @@ def get_daily_message_count(user):
     ).count()
 
 def build_system_prompt(companion):
+    # ---------- EXPANDED PERSONALITIES (12 types) ----------
     personality_prompts = {
         'empathetic': "You are deeply empathetic and compassionate. You listen carefully and validate feelings.",
         'logical': "You are analytical and logical. You help users think through problems with clear reasoning.",
         'playful': "You are warm, funny, and playful. You use humor to lighten the mood.",
-        'wise': "You are wise and philosophical. You offer deep insights and ask reflective questions."
+        'wise': "You are wise and philosophical. You offer deep insights and ask reflective questions.",
+        'creative': "You are imaginative and creative. You inspire users with new ideas and perspectives.",
+        'analytical': "You are detail-oriented and data-driven. You help users analyze situations objectively.",
+        'supportive': "You are encouraging and supportive. You build users' confidence and self-belief.",
+        'motivational': "You are energetic and motivational. You push users to achieve their goals.",
+        'intuitive': "You are intuitive and perceptive. You help users trust their instincts.",
+        'adventurous': "You are bold and adventurous. You encourage users to explore new possibilities.",
+        'gentle': "You are gentle and kind. You create a safe, calming environment for users.",
+        'witty': "You are clever and witty. You bring lightheartedness with smart humor."
     }
     tone_prompts = {
         'warm': "You speak warmly and gently.",
@@ -347,18 +357,20 @@ def register():
     db.session.add(user)
     db.session.commit()
 
-    # Seed default companions
+    # ---------- SEED 12 COMPANIONS WITH NEW PERSONALITIES ----------
     default_companions = [
         {'name': 'Alex', 'avatar': None, 'personality': 'empathetic', 'tone': 'warm', 'description': 'A calm listener who helps you reflect.'},
         {'name': 'Jordan', 'avatar': None, 'personality': 'logical', 'tone': 'formal', 'description': 'Clear‑headed and solution‑focused.'},
         {'name': 'Taylor', 'avatar': None, 'personality': 'playful', 'tone': 'casual', 'description': 'Cheerful, witty, and uplifting.'},
         {'name': 'Morgan', 'avatar': None, 'personality': 'wise', 'tone': 'warm', 'description': 'Thoughtful, patient, and insightful.'},
-        {'name': 'Riley', 'avatar': None, 'personality': 'empathetic', 'tone': 'casual', 'description': 'Grounded, supportive, and kind.'},
-        {'name': 'Casey', 'avatar': None, 'personality': 'logical', 'tone': 'warm', 'description': 'Analytical but approachable.'},
-        {'name': 'Quinn', 'avatar': None, 'personality': 'playful', 'tone': 'casual', 'description': 'Creative, energetic, and encouraging.'},
-        {'name': 'Avery', 'avatar': None, 'personality': 'wise', 'tone': 'formal', 'description': 'Deep, thoughtful, and measured.'},
-        {'name': 'Drew', 'avatar': None, 'personality': 'empathetic', 'tone': 'warm', 'description': 'Adventurous and open‑minded.'},
-        {'name': 'Sage', 'avatar': None, 'personality': 'wise', 'tone': 'warm', 'description': 'A gentle guide with a calm presence.'},
+        {'name': 'Riley', 'avatar': None, 'personality': 'creative', 'tone': 'casual', 'description': 'Imaginative and inspiring.'},
+        {'name': 'Casey', 'avatar': None, 'personality': 'analytical', 'tone': 'warm', 'description': 'Detail-oriented and objective.'},
+        {'name': 'Quinn', 'avatar': None, 'personality': 'supportive', 'tone': 'warm', 'description': 'Encouraging and confidence-building.'},
+        {'name': 'Avery', 'avatar': None, 'personality': 'motivational', 'tone': 'casual', 'description': 'Energetic goal‑pusher.'},
+        {'name': 'Drew', 'avatar': None, 'personality': 'intuitive', 'tone': 'warm', 'description': 'Perceptive and trusting of instinct.'},
+        {'name': 'Sage', 'avatar': None, 'personality': 'gentle', 'tone': 'warm', 'description': 'Soft and calming presence.'},
+        {'name': 'Blake', 'avatar': None, 'personality': 'adventurous', 'tone': 'casual', 'description': 'Bold and encouraging exploration.'},
+        {'name': 'Parker', 'avatar': None, 'personality': 'witty', 'tone': 'casual', 'description': 'Smart humor and cleverness.'}
     ]
     for comp_data in default_companions:
         comp = Companion(
@@ -751,18 +763,20 @@ def signup_web():
     db.session.add(user)
     db.session.commit()
 
-    # Seed default companions
+    # ---------- SEED 12 COMPANIONS WITH NEW PERSONALITIES ----------
     default_companions = [
         {'name': 'Alex', 'avatar': None, 'personality': 'empathetic', 'tone': 'warm', 'description': 'A calm listener who helps you reflect.'},
         {'name': 'Jordan', 'avatar': None, 'personality': 'logical', 'tone': 'formal', 'description': 'Clear‑headed and solution‑focused.'},
         {'name': 'Taylor', 'avatar': None, 'personality': 'playful', 'tone': 'casual', 'description': 'Cheerful, witty, and uplifting.'},
         {'name': 'Morgan', 'avatar': None, 'personality': 'wise', 'tone': 'warm', 'description': 'Thoughtful, patient, and insightful.'},
-        {'name': 'Riley', 'avatar': None, 'personality': 'empathetic', 'tone': 'casual', 'description': 'Grounded, supportive, and kind.'},
-        {'name': 'Casey', 'avatar': None, 'personality': 'logical', 'tone': 'warm', 'description': 'Analytical but approachable.'},
-        {'name': 'Quinn', 'avatar': None, 'personality': 'playful', 'tone': 'casual', 'description': 'Creative, energetic, and encouraging.'},
-        {'name': 'Avery', 'avatar': None, 'personality': 'wise', 'tone': 'formal', 'description': 'Deep, thoughtful, and measured.'},
-        {'name': 'Drew', 'avatar': None, 'personality': 'empathetic', 'tone': 'warm', 'description': 'Adventurous and open‑minded.'},
-        {'name': 'Sage', 'avatar': None, 'personality': 'wise', 'tone': 'warm', 'description': 'A gentle guide with a calm presence.'},
+        {'name': 'Riley', 'avatar': None, 'personality': 'creative', 'tone': 'casual', 'description': 'Imaginative and inspiring.'},
+        {'name': 'Casey', 'avatar': None, 'personality': 'analytical', 'tone': 'warm', 'description': 'Detail-oriented and objective.'},
+        {'name': 'Quinn', 'avatar': None, 'personality': 'supportive', 'tone': 'warm', 'description': 'Encouraging and confidence-building.'},
+        {'name': 'Avery', 'avatar': None, 'personality': 'motivational', 'tone': 'casual', 'description': 'Energetic goal‑pusher.'},
+        {'name': 'Drew', 'avatar': None, 'personality': 'intuitive', 'tone': 'warm', 'description': 'Perceptive and trusting of instinct.'},
+        {'name': 'Sage', 'avatar': None, 'personality': 'gentle', 'tone': 'warm', 'description': 'Soft and calming presence.'},
+        {'name': 'Blake', 'avatar': None, 'personality': 'adventurous', 'tone': 'casual', 'description': 'Bold and encouraging exploration.'},
+        {'name': 'Parker', 'avatar': None, 'personality': 'witty', 'tone': 'casual', 'description': 'Smart humor and cleverness.'}
     ]
     for comp_data in default_companions:
         comp = Companion(
