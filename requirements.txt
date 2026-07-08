@@ -11,3 +11,4 @@ requests
 apscheduler
 pytz
 gunicorn
+google-auth
