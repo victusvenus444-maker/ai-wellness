@@ -18,6 +18,8 @@ from dotenv import load_dotenv
 import requests
 from apscheduler.schedulers.background import BackgroundScheduler
 import pytz
+import boto3
+from botocore.exceptions import ClientError
 
 load_dotenv()
 
@@ -37,6 +39,20 @@ app.config['DEBUG'] = os.getenv('FLASK_DEBUG', 'False').lower() == 'true'
 # JWT
 app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', secrets.token_hex(32))
 jwt = JWTManager(app)
+
+# ---------- Amazon SES Configuration ----------
+AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+SES_SENDER_EMAIL = os.getenv('SES_SENDER_EMAIL', 'noreply@aura.com')
+
+# Initialize SES client
+ses_client = boto3.client(
+    'ses',
+    region_name=AWS_REGION,
+    aws_access_key_id=AWS_ACCESS_KEY_ID,
+    aws_secret_access_key=AWS_SECRET_ACCESS_KEY
+)
 
 logging.basicConfig(level=logging.INFO)
 app.logger.setLevel(logging.INFO)
@@ -75,6 +91,11 @@ class User(UserMixin, db.Model):
     monthly_messages_used = db.Column(db.Integer, default=0)
     month_start = db.Column(db.Date, default=date.today)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    # ---------- NEW: Email Verification & Password Reset ----------
+    email_verified = db.Column(db.Boolean, default=False)
+    verification_token = db.Column(db.String(100), nullable=True)
+    reset_token = db.Column(db.String(100), nullable=True)
+    reset_token_expiry = db.Column(db.DateTime, nullable=True)
     companions = db.relationship('Companion', backref='user', lazy=True, cascade='all, delete-orphan')
     referrer = db.relationship('User', remote_side=[id], backref='referees')
 
@@ -151,6 +172,33 @@ def generate_referral_code():
         code = secrets.token_urlsafe(4).upper()
         if not User.query.filter_by(referral_code=code).first():
             return code
+
+def generate_verification_token():
+    return secrets.token_urlsafe(32)
+
+def send_email(to, subject, body):
+    """Send email using Amazon SES."""
+    try:
+        response = ses_client.send_email(
+            Source=SES_SENDER_EMAIL,
+            Destination={
+                'ToAddresses': [to]
+            },
+            Message={
+                'Subject': {'Data': subject},
+                'Body': {
+                    'Text': {'Data': body}  # Plain text; you can add HTML if needed
+                }
+            }
+        )
+        app.logger.info(f"Email sent to {to}, MessageId: {response['MessageId']}")
+        return True
+    except ClientError as e:
+        app.logger.error(f"SES email error: {e.response['Error']['Message']}")
+        return False
+    except Exception as e:
+        app.logger.error(f"Unexpected email error: {e}")
+        return False
 
 def get_plan_limit(plan):
     if plan == 'free':
@@ -345,6 +393,9 @@ def register():
     user = User(email=email)
     user.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
     user.referral_code = generate_referral_code()
+    # ---------- NEW: Generate verification token ----------
+    user.verification_token = generate_verification_token()
+    user.email_verified = False
 
     if referral_code:
         referrer = User.query.filter_by(referral_code=referral_code).first()
@@ -384,6 +435,18 @@ def register():
         db.session.add(comp)
     db.session.commit()
 
+    # ---------- NEW: Send verification email via SES ----------
+    verify_link = f"{request.host_url}api/verify-email?token={user.verification_token}"
+    body = f"""Welcome to Aura!
+
+Please verify your email address by clicking the link below:
+{verify_link}
+
+If you did not create an account, please ignore this email.
+
+— The Aura Team"""
+    send_email(user.email, "Verify your Aura account", body)
+
     access_token = create_access_token(identity=user.id)
     return jsonify({'access_token': access_token, 'user': {'email': user.email, 'id': user.id}}), 201
 
@@ -395,8 +458,103 @@ def login():
     user = User.query.filter_by(email=email).first()
     if not user or not bcrypt.check_password_hash(user.password_hash, password):
         return jsonify({'error': 'Invalid credentials'}), 401
+    # Note: we allow login even if not verified; client can show a warning
     access_token = create_access_token(identity=user.id)
-    return jsonify({'access_token': access_token, 'user': {'email': user.email, 'id': user.id}}), 200
+    return jsonify({
+        'access_token': access_token,
+        'user': {
+            'email': user.email,
+            'id': user.id,
+            'email_verified': user.email_verified
+        }
+    }), 200
+
+# ---------- NEW: Email Verification ----------
+@app.route('/api/verify-email', methods=['GET'])
+def verify_email():
+    token = request.args.get('token')
+    if not token:
+        return jsonify({'error': 'Missing token'}), 400
+    user = User.query.filter_by(verification_token=token).first()
+    if not user:
+        return jsonify({'error': 'Invalid token'}), 400
+    user.email_verified = True
+    user.verification_token = None
+    db.session.commit()
+    # Return a simple success page (or JSON if called from app)
+    return render_template_string("""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>Email Verified</title>
+        <style>
+            body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background: #f4f6fb; }
+            .container { max-width: 500px; margin: 0 auto; background: white; padding: 40px; border-radius: 24px; box-shadow: 0 20px 60px rgba(0,0,0,0.08); }
+            h1 { color: #4a6cf7; }
+            p { color: #5a5a7a; }
+            .btn { display: inline-block; padding: 10px 24px; background: #4a6cf7; color: white; border-radius: 40px; text-decoration: none; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>✅ Email Verified!</h1>
+            <p>Your email has been successfully verified. You can now close this window and return to the app.</p>
+            <a href="/" class="btn">Go to Aura</a>
+        </div>
+    </body>
+    </html>
+    """)
+
+# ---------- NEW: Password Reset ----------
+@app.route('/api/request-reset', methods=['POST'])
+def request_reset():
+    data = request.get_json()
+    email = data.get('email')
+    if not email:
+        return jsonify({'error': 'Email required'}), 400
+    user = User.query.filter_by(email=email).first()
+    # For security, don't reveal if email exists
+    if not user:
+        return jsonify({'success': True, 'message': 'If that email exists, a reset link was sent'}), 200
+    # Generate reset token
+    user.reset_token = secrets.token_urlsafe(32)
+    user.reset_token_expiry = datetime.utcnow() + timedelta(hours=1)
+    db.session.commit()
+    reset_link = f"{request.host_url}reset-password?token={user.reset_token}"
+    body = f"""Hello,
+
+You requested to reset your password for your Aura account.
+
+Click the link below to reset your password:
+{reset_link}
+
+This link will expire in 1 hour.
+
+If you did not request this, please ignore this email.
+
+— The Aura Team"""
+    send_email(user.email, "Reset your Aura password", body)
+    return jsonify({'success': True, 'message': 'Reset link sent'}), 200
+
+@app.route('/api/reset-password', methods=['POST'])
+def reset_password():
+    data = request.get_json()
+    token = data.get('token')
+    new_password = data.get('new_password')
+    if not token or not new_password:
+        return jsonify({'error': 'Token and new password required'}), 400
+    if len(new_password) < 6:
+        return jsonify({'error': 'Password must be at least 6 characters'}), 400
+    user = User.query.filter_by(reset_token=token).first()
+    if not user:
+        return jsonify({'error': 'Invalid token'}), 400
+    if user.reset_token_expiry < datetime.utcnow():
+        return jsonify({'error': 'Token expired'}), 400
+    user.password_hash = bcrypt.generate_password_hash(new_password).decode('utf-8')
+    user.reset_token = None
+    user.reset_token_expiry = None
+    db.session.commit()
+    return jsonify({'success': True, 'message': 'Password reset successfully'}), 200
 
 # ---------- Protected Routes (JWT) ----------
 @app.route('/api/me', methods=['GET'])
@@ -404,7 +562,12 @@ def login():
 def get_user():
     user_id = get_jwt_identity()
     user = User.query.get(user_id)
-    return jsonify({'id': user.id, 'email': user.email, 'plan': user.plan})
+    return jsonify({
+        'id': user.id,
+        'email': user.email,
+        'plan': user.plan,
+        'email_verified': user.email_verified
+    })
 
 # ---------- API Routes ----------
 @app.route('/api/referral', methods=['GET'])
@@ -700,7 +863,7 @@ def api_cancel_subscription():
 @app.route('/api/sessions', methods=['GET'])
 @jwt_required()
 def get_sessions():
-    """List sessions for a companion (optional)."""
+    """List sessions for a companion."""
     user_id = get_jwt_identity()
     companion_id = request.args.get('companion_id', type=int)
     if not companion_id:
@@ -853,9 +1016,6 @@ def create_checkout():
     plan = data.get('plan')
     if plan not in ('elite', 'pro'):
         return jsonify({'error': 'Invalid plan'}), 400
-    # For demo, we return a success message; in production, return a checkout URL
-    # Example: return jsonify({'checkout_url': 'https://example.com/checkout'})
-    # For now, we just inform the user to upgrade via the app or return a dummy URL.
     return jsonify({
         'checkout_url': f'https://your-payment-provider.com/checkout?plan={plan}',
         'message': f'Checkout for {plan} plan. (Replace with actual integration.)'
@@ -868,11 +1028,9 @@ def shared_session(session_id):
     if not session_obj:
         return "Session not found", 404
     messages = session_obj.messages.order_by(ChatMessage.created_at).all()
-    # Prepare messages for JSON serialization
     msg_list = [{'role': m.role, 'content': m.content, 'created_at': m.created_at.isoformat()} for m in messages]
     companion = Companion.query.get(session_obj.companion_id)
     companion_name = companion.name if companion else "Unknown"
-    # Render a simple HTML page with the messages
     html = f"""
     <!DOCTYPE html>
     <html>
