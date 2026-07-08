@@ -67,12 +67,10 @@ REVENUECAT_WEBHOOK_SECRET = os.getenv('REVENUECAT_WEBHOOK_SECRET')
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    # ---------- NEW: Google OAuth fields ----------
     google_id = db.Column(db.String(100), unique=True, nullable=False)
     name = db.Column(db.String(100), nullable=True)
     picture = db.Column(db.String(200), nullable=True)
-    # ---------- Removed password_hash, email_verified, verification_token, reset_token, reset_token_expiry ----------
-    plan = db.Column(db.String(20), default='free')  # free, elite, pro
+    plan = db.Column(db.String(20), default='free')
     revenuecat_user_id = db.Column(db.String(100), nullable=True)
     subscription_product_id = db.Column(db.String(100), nullable=True)
     referral_code = db.Column(db.String(20), unique=True, nullable=False)
@@ -125,7 +123,6 @@ class ChatMessage(db.Model):
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
-# Proactive Messaging Models
 class ProactiveMessage(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
@@ -159,10 +156,7 @@ def generate_referral_code():
 
 # ---------- Google OAuth ----------
 def verify_google_token(token):
-    """Verify Google ID token and return user info dict."""
     try:
-        # Specify the CLIENT_ID of the app that accesses the backend.
-        # You can get this from Google Cloud Console -> Credentials -> OAuth 2.0 Client ID
         CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID')
         if not CLIENT_ID:
             raise ValueError("GOOGLE_CLIENT_ID not set")
@@ -172,7 +166,7 @@ def verify_google_token(token):
         app.logger.error(f"Google token verification failed: {e}")
         return None
 
-# ---------- Auth Routes (JWT) ----------
+# ---------- Auth Routes ----------
 @app.route('/auth/google', methods=['POST'])
 def google_login():
     data = request.get_json()
@@ -192,11 +186,8 @@ def google_login():
     if not email:
         return jsonify({'error': 'Email not provided by Google'}), 400
 
-    # Check if user exists
     user = User.query.filter_by(google_id=google_id).first()
     if not user:
-        # Also check by email in case they signed up earlier with email/password? We'll create new user.
-        # If you have existing users with email/password, you might want to link them, but we'll start fresh.
         user = User(
             email=email,
             google_id=google_id,
@@ -207,7 +198,6 @@ def google_login():
         db.session.add(user)
         db.session.commit()
 
-        # Seed default companions
         default_companions = [
             {'name': 'Alex', 'avatar': None, 'personality': 'empathetic', 'tone': 'warm', 'description': 'A calm listener who helps you reflect.'},
             {'name': 'Jordan', 'avatar': None, 'personality': 'logical', 'tone': 'formal', 'description': 'Clear‑headed and solution‑focused.'},
@@ -234,7 +224,6 @@ def google_login():
             db.session.add(comp)
         db.session.commit()
 
-    # Update user info if changed
     if user.name != name or user.picture != picture:
         user.name = name
         user.picture = picture
@@ -437,6 +426,58 @@ def chat():
 
     return jsonify({'reply': reply, 'session_id': session_obj.session_id})
 
+# ---------- usage, proactive messages, etc. ----------
+def get_plan_limit(plan):
+    if plan == 'free':
+        return 10
+    elif plan == 'elite':
+        return 1000
+    elif plan == 'pro':
+        return 10000
+    return 10
+
+def check_and_reset_monthly_usage(user):
+    today = date.today()
+    if user.month_start.month != today.month or user.month_start.year != today.year:
+        user.monthly_messages_used = 0
+        user.month_start = today
+        db.session.commit()
+        return True
+    return False
+
+def get_daily_message_count(user):
+    today = datetime.utcnow().date()
+    return ChatMessage.query.join(ChatSession).filter(
+        ChatSession.user_id == user.id,
+        db.func.date(ChatMessage.created_at) == today,
+        ChatMessage.role == 'user'
+    ).count()
+
+def build_system_prompt(companion):
+    personality_prompts = {
+        'empathetic': "You are deeply empathetic and compassionate. You listen carefully and validate feelings.",
+        'logical': "You are analytical and logical. You help users think through problems with clear reasoning.",
+        'playful': "You are warm, funny, and playful. You use humor to lighten the mood.",
+        'wise': "You are wise and philosophical. You offer deep insights and ask reflective questions.",
+        'creative': "You are imaginative and creative. You inspire users with new ideas and perspectives.",
+        'analytical': "You are detail-oriented and data-driven. You help users analyze situations objectively.",
+        'supportive': "You are encouraging and supportive. You build users' confidence and self-belief.",
+        'motivational': "You are energetic and motivational. You push users to achieve their goals.",
+        'intuitive': "You are intuitive and perceptive. You help users trust their instincts.",
+        'adventurous': "You are bold and adventurous. You encourage users to explore new possibilities.",
+        'gentle': "You are gentle and kind. You create a safe, calming environment for users.",
+        'witty': "You are clever and witty. You bring lightheartedness with smart humor."
+    }
+    tone_prompts = {
+        'warm': "You speak warmly and gently.",
+        'formal': "You speak formally and respectfully.",
+        'casual': "You speak casually and informally, like a close friend."
+    }
+    base = f"You are {companion.name}, a wellness companion. {personality_prompts.get(companion.personality, personality_prompts['empathetic'])} {tone_prompts.get(companion.tone, tone_prompts['warm'])} You never diagnose or prescribe. Always remind users you're not a replacement for professional help. Keep responses warm and concise (2-3 sentences)."
+    if companion.description:
+        base += f" Your backstory: {companion.description}"
+    return base
+
 @app.route('/api/usage', methods=['GET'])
 @jwt_required()
 def get_usage():
@@ -489,8 +530,7 @@ def mark_proactive_read(msg_id):
     db.session.commit()
     return jsonify({'success': True})
 
-# ---------- NEW API ENDPOINTS (JWT) for Flutter & Account Management ----------
-
+# ---------- ACCOUNT MANAGEMENT ----------
 @app.route('/api/update-plan', methods=['POST'])
 @jwt_required()
 def update_plan():
@@ -507,12 +547,6 @@ def update_plan():
     user.month_start = date.today()
     db.session.commit()
     return jsonify({'success': True, 'plan': user.plan})
-
-@app.route('/api/change-password', methods=['POST'])
-@jwt_required()
-def api_change_password():
-    # No longer needed, but keep a placeholder that returns error
-    return jsonify({'error': 'Password management is not supported. Please use Google Sign-In.'}), 400
 
 @app.route('/api/delete-account', methods=['POST'])
 @jwt_required()
@@ -555,194 +589,102 @@ def get_sessions():
         'message_count': len(s.messages)
     } for s in sessions])
 
-# ---------- SESSION-BASED WEB AUTH (for HTML views) ----------
-@app.route('/login', methods=['GET', 'POST'])
-def login_web():
-    # For web, we'll redirect to a page that uses Google Sign-In via JavaScript.
-    # But we can just render a simple login page that calls our /auth/google endpoint.
-    # We'll keep it simple – return a message that web auth is handled by Google.
-    return render_template_string("""
-    <!DOCTYPE html>
-    <html>
-    <head><title>Login</title></head>
-    <body>
-        <h1>Login with Google</h1>
-        <p>This app uses Google Sign-In. Please use the mobile app or a web client that integrates Google OAuth.</p>
-        <a href="/">Go back</a>
-    </body>
-    </html>
-    """)
+# ---------- REVENUECAT WEBHOOK ----------
+@app.route('/webhook/revenuecat', methods=['POST'])
+def revenuecat_webhook():
+    # Verify HMAC signature (RevenueCat sends X-RevenueCat-Webhook-Signature)
+    signature_header = request.headers.get('X-RevenueCat-Webhook-Signature')
+    if not signature_header or not REVENUECAT_WEBHOOK_SECRET:
+        app.logger.warning("Missing signature or secret")
+        return 'Missing signature', 400
 
-@app.route('/signup', methods=['POST'])
-def signup_web():
-    # Not needed – redirect to login
-    return redirect(url_for('login_web'))
+    # Parse the header: format "t=<timestamp>,v1=<hmac>"
+    try:
+        parts = dict(p.split("=", 1) for p in signature_header.split(","))
+        timestamp = parts.get("t")
+        expected_sig = parts.get("v1")
+        if not timestamp or not expected_sig:
+            raise ValueError("Invalid signature header format")
+    except Exception as e:
+        app.logger.warning(f"Could not parse signature header: {e}")
+        return 'Invalid signature header', 400
 
-@app.route('/logout')
-@login_required
-def logout_web():
-    logout_user()
-    flash('Logged out', 'info')
-    return redirect(url_for('index'))
+    # Get the raw request body (bytes)
+    payload = request.get_data()
 
-# ---------- WEB ACCOUNT MANAGEMENT (session-based) ----------
-@app.route('/change-password', methods=['POST'])
-@login_required
-def change_password_web():
-    flash('Password management is not supported. Please use Google Sign-In.', 'error')
-    return redirect(url_for('dashboard'))
+    # Compute HMAC
+    signed_payload = f"{timestamp}.".encode() + payload
+    computed = hmac.new(
+        REVENUECAT_WEBHOOK_SECRET.encode(),
+        signed_payload,
+        hashlib.sha256
+    ).hexdigest()
 
-@app.route('/delete-account', methods=['POST'])
-@login_required
-def delete_account_web():
-    user = current_user
-    logout_user()
-    db.session.delete(user)
-    db.session.commit()
-    flash('Account deleted', 'info')
-    return redirect(url_for('index'))
+    # Constant-time compare
+    if not hmac.compare_digest(computed, expected_sig):
+        app.logger.warning("Invalid webhook signature")
+        return 'Invalid signature', 401
 
-@app.route('/cancel-subscription', methods=['POST'])
-@login_required
-def cancel_subscription_web():
-    user = current_user
-    user.plan = 'free'
-    user.subscription_product_id = None
-    user.monthly_messages_used = 0
-    user.month_start = date.today()
-    db.session.commit()
-    flash('Subscription cancelled. You are now on the Free plan.', 'success')
-    return redirect(url_for('dashboard'))
+    # Optionally check timestamp freshness (e.g., within 5 minutes)
+    try:
+        if abs(datetime.utcnow().timestamp() - int(timestamp)) > 300:
+            app.logger.warning("Webhook timestamp too old")
+            return 'Timestamp too old', 400
+    except:
+        pass
 
-# ---------- CHECKOUT (for web pricing) ----------
-@app.route('/create-checkout', methods=['POST'])
-@login_required
-def create_checkout():
-    data = request.get_json()
-    plan = data.get('plan')
-    if plan not in ('elite', 'pro'):
-        return jsonify({'error': 'Invalid plan'}), 400
-    # Replace with your actual payment provider URL
-    return jsonify({
-        'checkout_url': f'https://your-payment-provider.com/checkout?plan={plan}',
-        'message': f'Checkout for {plan} plan. (Replace with actual integration.)'
-    })
+    # Process the webhook event
+    data = request.json
+    event = data.get('event')
 
-# ---------- SHARED SESSION VIEW (public, read-only) ----------
-@app.route('/s/<session_id>')
-def shared_session(session_id):
-    session_obj = ChatSession.query.filter_by(session_id=session_id).first()
-    if not session_obj:
-        return "Session not found", 404
-    messages = session_obj.messages.order_by(ChatMessage.created_at).all()
-    msg_list = [{'role': m.role, 'content': m.content, 'created_at': m.created_at.isoformat()} for m in messages]
-    companion = Companion.query.get(session_obj.companion_id)
-    companion_name = companion.name if companion else "Unknown"
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Shared Session - {companion_name}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap" rel="stylesheet" />
-        <style>
-            * {{ margin:0; padding:0; box-sizing:border-box; }}
-            body {{
-                font-family: 'Inter', sans-serif;
-                background: #f4f6fb;
-                color: #1a1a2e;
-                padding: 20px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                min-height: 100vh;
-            }}
-            .container {{
-                max-width: 800px;
-                width: 100%;
-                background: #ffffff;
-                border-radius: 24px;
-                padding: 24px;
-                box-shadow: 0 20px 60px rgba(0,0,0,0.08);
-            }}
-            h1 {{
-                font-size: 24px;
-                margin-bottom: 4px;
-                background: linear-gradient(135deg, #4a6cf7, #a855f7);
-                -webkit-background-clip: text;
-                -webkit-text-fill-color: transparent;
-            }}
-            .sub {{
-                color: #5a5a7a;
-                margin-bottom: 20px;
-                border-left: 3px solid #4a6cf7;
-                padding-left: 12px;
-            }}
-            .message {{
-                padding: 12px 16px;
-                border-radius: 12px;
-                margin-bottom: 8px;
-                max-width: 80%;
-            }}
-            .message.user {{
-                background: #4a6cf7;
-                color: #fff;
-                align-self: flex-end;
-                margin-left: auto;
-            }}
-            .message.assistant {{
-                background: #f1f3f8;
-                color: #1a1a2e;
-                align-self: flex-start;
-            }}
-            .message .time {{
-                font-size: 10px;
-                opacity: 0.6;
-                display: block;
-                margin-top: 4px;
-            }}
-            .messages {{
-                display: flex;
-                flex-direction: column;
-            }}
-            .readonly-note {{
-                margin-top: 20px;
-                padding: 12px;
-                background: #f1f3f8;
-                border-radius: 12px;
-                text-align: center;
-                color: #5a5a7a;
-                font-size: 14px;
-            }}
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <h1>🔗 Shared Session</h1>
-            <div class="sub">with {companion_name} • {len(messages)} messages</div>
-            <div class="messages">
-    """
-    for msg in msg_list:
-        role = msg['role']
-        content = msg['content']
-        time_str = msg['created_at'][:16].replace('T', ' ')
-        html += f"""
-                <div class="message {role}">
-                    {content}
-                    <span class="time">{time_str}</span>
-                </div>
-        """
-    html += """
-            </div>
-            <div class="readonly-note">📌 This is a read‑only view of a shared conversation.</div>
-        </div>
-    </body>
-    </html>
-    """
-    return render_template_string(html)
+    if event in ('INITIAL_PURCHASE', 'RENEWAL', 'NON_RENEWING_PURCHASE'):
+        app_user_id = data.get('app_user_id')
+        if not app_user_id:
+            return jsonify({'error': 'Missing app_user_id'}), 400
 
-# ---------- Web Views ----------
+        try:
+            user_id = int(app_user_id)
+        except ValueError:
+            return jsonify({'error': 'Invalid app_user_id'}), 400
+
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        # Extract product_id
+        product_id = None
+        if 'purchases' in data and data['purchases']:
+            first_purchase = data['purchases'][0]
+            product_id = first_purchase.get('product_id')
+        elif 'product' in data:
+            product_id = data.get('product')
+
+        if product_id:
+            if product_id.startswith('aura_elite'):
+                user.plan = 'elite'
+            elif product_id.startswith('aura_pro'):
+                user.plan = 'pro'
+            else:
+                user.plan = 'pro'
+            user.subscription_product_id = product_id
+        else:
+            # Fallback: assume pro if entitlement is active
+            entitlement = data.get('entitlements', {}).get('pro', {})
+            if entitlement.get('is_active'):
+                user.plan = 'pro'
+            else:
+                # If no entitlement, keep current plan? But we should be safe.
+                pass
+
+        user.monthly_messages_used = 0
+        user.month_start = date.today()
+        db.session.commit()
+        app.logger.info(f"Webhook: user {user.id} plan updated to {user.plan} (product: {product_id})")
+        return jsonify({'status': 'ok'}), 200
+
+    return jsonify({'status': 'ignored'}), 200
+
+# ---------- Web Views (for web version) ----------
 @app.route('/')
 def index():
     return render_template('index.html')
